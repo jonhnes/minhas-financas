@@ -46,6 +46,12 @@ module Api
 
         current_user.tags.where(id: ids).pluck(:id)
       end
+
+      def lookup_statement(id)
+        return if id.blank?
+
+        Statement.joins(:credit_card).where(credit_cards: { user_id: current_user.id }).find(id)
+      end
     end
   end
 end

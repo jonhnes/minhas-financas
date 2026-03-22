@@ -86,6 +86,8 @@ module Api
           card_holder_id: transaction.card_holder_id,
           category_id: transaction.category_id,
           recurring_rule_id: transaction.recurring_rule_id,
+          statement_id: transaction.statement_id,
+          import_item_id: transaction.import_item_id,
           transfer_account_id: transaction.transfer_account_id,
           transaction_type: transaction.transaction_type,
           impact_mode: transaction.impact_mode,
@@ -100,9 +102,75 @@ module Api
           credit_card_name: transaction.credit_card&.name,
           card_holder_name: transaction.card_holder&.name,
           category_name: transaction.category&.name,
+          statement_due_date: transaction.statement&.due_date,
           transfer_account_name: transaction.transfer_account&.name,
           tags: transaction.tags.map { |tag_record| Api::V1::Serializers.tag(tag_record) }
         }
+      end
+
+      def statement(statement)
+        {
+          id: statement.id,
+          credit_card_id: statement.credit_card_id,
+          credit_card_name: statement.credit_card.name,
+          period_start: statement.period_start,
+          period_end: statement.period_end,
+          due_date: statement.due_date,
+          total_amount_cents: statement.total_amount_cents,
+          status: statement.status,
+          metadata: statement.metadata,
+          transactions_count: statement.transactions.size
+        }
+      end
+
+      def import_item(import_item)
+        {
+          id: import_item.id,
+          import_id: import_item.import_id,
+          linked_transaction_id: import_item.linked_transaction_id,
+          line_index: import_item.line_index,
+          occurred_on: import_item.occurred_on,
+          description: import_item.description,
+          amount_cents: import_item.amount_cents,
+          transaction_type: import_item.transaction_type,
+          impact_mode: import_item.impact_mode,
+          category_id: import_item.category_id,
+          category_name: import_item.category&.name,
+          card_holder_id: import_item.card_holder_id,
+          card_holder_name: import_item.card_holder&.name,
+          canonical_merchant_name: import_item.canonical_merchant_name,
+          raw_holder_name: import_item.raw_holder_name,
+          status: import_item.status,
+          ignored: import_item.ignored,
+          metadata: import_item.metadata
+        }
+      end
+
+      def import(import_record, include_items: false)
+        items = import_record.import_items.ordered.to_a
+
+        payload = {
+          id: import_record.id,
+          user_id: import_record.user_id,
+          credit_card_id: import_record.credit_card_id,
+          credit_card_name: import_record.credit_card.name,
+          statement_id: import_record.statement_id,
+          source_kind: import_record.source_kind,
+          provider_key: import_record.provider_key,
+          status: import_record.status,
+          error_payload: import_record.error_payload,
+          processing_started_at: import_record.processing_started_at,
+          processing_finished_at: import_record.processing_finished_at,
+          confirmed_at: import_record.confirmed_at,
+          statement_draft: import_record.statement_payload,
+          summary: import_record.summary_payload,
+          items_count: items.size,
+          missing_category_count: items.count(&:needs_category?),
+          can_confirm: import_record.confirmable? && items.none?(&:needs_category?)
+        }
+
+        payload[:items] = items.map { |item| import_item(item) } if include_items
+        payload
       end
 
       def budget(budget, spent_cents: nil)

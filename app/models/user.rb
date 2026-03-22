@@ -8,6 +8,7 @@ class User < ApplicationRecord
   has_many :budgets, dependent: :destroy
   has_many :categories, dependent: :destroy
   has_many :credit_cards, dependent: :destroy
+  has_many :imports, dependent: :destroy
   has_many :recurring_rules, dependent: :destroy
   has_many :tags, dependent: :destroy
   has_many :transactions, dependent: :destroy

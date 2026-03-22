@@ -23,7 +23,12 @@ Rails.application.routes.draw do
       end
       resources :categories, except: %i[new edit]
       resources :tags, except: %i[new edit]
+      resources :statements, only: %i[index show]
       resources :transactions, except: %i[new edit]
+      resources :imports, only: %i[index show create update] do
+        post :confirm, on: :member
+      end
+      resources :import_items, only: %i[update]
       resources :budgets, except: %i[new edit]
       resources :recurring_rules, except: %i[new edit]
 

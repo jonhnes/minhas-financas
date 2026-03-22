@@ -5,6 +5,8 @@ class Transaction < ApplicationRecord
   belongs_to :card_holder, optional: true
   belongs_to :category, optional: true
   belongs_to :recurring_rule, optional: true
+  belongs_to :statement, optional: true
+  belongs_to :import_item, optional: true
   belongs_to :transfer_account, class_name: "Account", optional: true
 
   has_many :transaction_tags, class_name: "TransactionTag", foreign_key: :transaction_id, dependent: :destroy, inverse_of: :entry

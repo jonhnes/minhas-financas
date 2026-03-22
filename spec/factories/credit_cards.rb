@@ -1,7 +1,7 @@
 FactoryBot.define do
   factory :credit_card do
     association :user
-    association :payment_account, factory: :account
+    payment_account { association :account, user: user }
     sequence(:name) { |index| "Cartão #{index}" }
     brand { "Visa" }
     credit_limit_cents { 500_000 }

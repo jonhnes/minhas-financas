@@ -53,6 +53,11 @@ config/secrets.yml
 /.bundle
 /vendor/bundle
 
+# Ignore uploaded files in development
+/storage/*
+!/storage/.keep
+/public/uploads
+
 /.idea/*
 
 /doc

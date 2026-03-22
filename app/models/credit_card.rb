@@ -3,6 +3,8 @@ class CreditCard < ApplicationRecord
   belongs_to :payment_account, class_name: "Account", optional: true, inverse_of: :credit_cards
 
   has_many :card_holders, dependent: :destroy
+  has_many :imports, dependent: :restrict_with_exception
+  has_many :statements, dependent: :restrict_with_exception
   has_many :transactions, dependent: :restrict_with_exception
 
   validates :name, :closing_day, :due_day, presence: true
@@ -18,11 +20,27 @@ class CreditCard < ApplicationRecord
     scope.sum(:amount_cents)
   end
 
+  def current_statement
+    statements.recent_first.first
+  end
+
   def cycle_range(reference_date = Time.zone.today)
     reference_date = reference_date.to_date
     last_closing = last_closing_for(reference_date)
     next_closing = next_closing_for(reference_date)
     (last_closing + 1.day)..next_closing
+  end
+
+  def statement_period_for_due_date(due_date)
+    due_date = due_date.to_date
+    period_end_base = due_date.day > closing_day ? due_date : due_date.prev_month
+    period_end = closing_on(period_end_base)
+    previous_period_end = closing_on(period_end.prev_month)
+
+    {
+      period_start: previous_period_end + 1.day,
+      period_end: period_end
+    }
   end
 
   private

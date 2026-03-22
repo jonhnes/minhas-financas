@@ -12,6 +12,7 @@ gem "pundit"
 gem "rack-cors"
 gem "sidekiq"
 gem "sidekiq-cron"
+gem "pdf-reader"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]

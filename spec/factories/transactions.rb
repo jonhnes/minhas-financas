@@ -1,10 +1,10 @@
 FactoryBot.define do
   factory :transaction do
     association :user
-    association :account
+    account { association :account, user: user }
     credit_card { nil }
     card_holder { nil }
-    association :category
+    category { association :category, user: user }
     recurring_rule { nil }
     transfer_account { nil }
     transaction_type { "expense" }

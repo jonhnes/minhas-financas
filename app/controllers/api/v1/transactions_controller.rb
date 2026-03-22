@@ -89,6 +89,7 @@ module Api
         scope = scope.where(credit_card_id: params[:credit_card_id]) if params[:credit_card_id].present?
         scope = scope.where(card_holder_id: params[:card_holder_id]) if params[:card_holder_id].present?
         scope = scope.where(category_id: params[:category_id]) if params[:category_id].present?
+        scope = scope.where(statement_id: params[:statement_id]) if params[:statement_id].present?
         scope = scope.where(impact_mode: params[:impact_mode]) if params[:impact_mode].present?
         scope = scope.where(transaction_type: params[:transaction_type]) if params[:transaction_type].present?
         scope = scope.where("occurred_on >= ?", params[:occurred_from]) if params[:occurred_from].present?
