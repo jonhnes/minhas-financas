@@ -1,0 +1,11 @@
+:concurrency: 5
+:queues:
+  - default
+  - recurring
+
+:scheduler:
+  :schedule:
+    materialize_recurring_transactions:
+      cron: "0 4 * * * America/Sao_Paulo"
+      class: "RecurringRules::MaterializeDueTransactionsJob"
+      queue: recurring
