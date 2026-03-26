@@ -1,11 +1,14 @@
 module Api
   module V1
     class TransactionsController < BaseController
+      SORTABLE_FIELDS = %w[occurred_on category_name].freeze
+      SORT_DIRECTIONS = %w[asc desc].freeze
+
       before_action :set_transaction, only: %i[show update destroy]
 
       def index
         authorize Transaction
-        scope = filter_scope(policy_scope(Transaction).includes(:account, :credit_card, :card_holder, :category, :tags).chronological)
+        scope = sort_scope(filter_scope(policy_scope(Transaction).includes(:account, :credit_card, :card_holder, :category, :tags)))
         render_collection scope, serializer: Api::V1::Serializers.method(:transaction)
       end
 
@@ -100,6 +103,20 @@ module Api
 
         query = "%#{params[:query].strip}%"
         scope.where("description ILIKE :query OR canonical_merchant_name ILIKE :query", query: query)
+      end
+
+      def sort_scope(scope)
+        sort_by = SORTABLE_FIELDS.include?(params[:sort_by]) ? params[:sort_by] : "occurred_on"
+        sort_direction = SORT_DIRECTIONS.include?(params[:sort_direction]) ? params[:sort_direction] : "desc"
+
+        case sort_by
+        when "category_name"
+          scope
+            .left_outer_joins(:category)
+            .reorder(Arel.sql("LOWER(categories.name) #{sort_direction.upcase} NULLS LAST"), occurred_on: :desc, created_at: :desc)
+        else
+          scope.reorder(occurred_on: sort_direction.to_sym, created_at: :desc)
+        end
       end
     end
   end

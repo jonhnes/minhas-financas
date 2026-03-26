@@ -10,6 +10,7 @@ module Api
           email: user.email,
           timezone: user.timezone,
           locale: user.locale,
+          ui_preferences: user.ui_preferences || {},
           onboarding_completed_at: user.onboarding_completed_at,
           onboarding_completed: user.onboarding_completed?
         }
