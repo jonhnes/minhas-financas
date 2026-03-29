@@ -19,6 +19,10 @@ class ImportPolicy < ApplicationPolicy
     owner?
   end
 
+  def destroy?
+    owner?
+  end
+
   class Scope < Scope
     def resolve
       scope.where(user: user)

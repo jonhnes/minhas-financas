@@ -1,7 +1,7 @@
 module Api
   module V1
     class ImportsController < BaseController
-      before_action :set_import, only: %i[show update confirm]
+      before_action :set_import, only: %i[show update confirm destroy]
 
       def index
         authorize Import
@@ -46,10 +46,18 @@ module Api
         render json: { errors: [error.message] }, status: :unprocessable_entity
       end
 
+      def destroy
+        authorize @import, :destroy?
+        Imports::DestroyImport.new(import: @import).call
+        head :no_content
+      rescue Imports::DestroyImport::DestroyError => error
+        render json: { errors: [error.message] }, status: :unprocessable_entity
+      end
+
       private
 
       def set_import
-        @import = policy_scope(Import).includes(import_items: %i[category card_holder]).find(params[:id])
+        @import = policy_scope(Import).includes(:statement, import_items: %i[category card_holder]).find(params[:id])
       end
 
       def import_params

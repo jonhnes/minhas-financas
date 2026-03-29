@@ -87,6 +87,91 @@ RSpec.describe "API imports", type: :request do
     expect(response.parsed_body.dig("data", 0, "id")).to eq(import_record.statement_id)
   end
 
+  it "deletes a pending import" do
+    user = create(:user)
+    import_record = create(:import, user: user)
+    import_item = create(:import_item, import: import_record)
+
+    sign_in user
+
+    delete "/api/v1/imports/#{import_record.id}", headers: csrf_headers
+
+    expect(response).to have_http_status(:no_content)
+    expect(Import.exists?(import_record.id)).to be(false)
+    expect(ImportItem.exists?(import_item.id)).to be(false)
+  end
+
+  it "deletes a confirmed import and rolls back statement plus generated transactions" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    category = create(:category, user: user)
+    statement = create(:statement, credit_card: credit_card)
+    import_record = create(:import,
+      user: user,
+      credit_card: credit_card,
+      statement: statement,
+      status: :confirmed,
+      confirmed_at: Time.zone.parse("2026-03-22 21:00:00"))
+    import_item = create(:import_item, import: import_record, category: category, status: :imported)
+    transaction = create(:transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      statement: statement,
+      import_item: import_item)
+    import_item.update!(linked_transaction: transaction)
+
+    sign_in user
+
+    delete "/api/v1/imports/#{import_record.id}", headers: csrf_headers
+
+    expect(response).to have_http_status(:no_content)
+    expect(Import.exists?(import_record.id)).to be(false)
+    expect(ImportItem.exists?(import_item.id)).to be(false)
+    expect(Transaction.exists?(transaction.id)).to be(false)
+    expect(Statement.exists?(statement.id)).to be(false)
+  end
+
+  it "returns 422 when a confirmed import cannot be rolled back safely" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    category = create(:category, user: user)
+    statement = create(:statement, credit_card: credit_card)
+    import_record = create(:import,
+      user: user,
+      credit_card: credit_card,
+      statement: statement,
+      status: :confirmed,
+      confirmed_at: Time.zone.parse("2026-03-22 21:00:00"))
+    import_item = create(:import_item, import: import_record, category: category, status: :imported)
+    transaction = create(:transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      statement: statement,
+      import_item: import_item)
+    import_item.update!(linked_transaction: transaction)
+    extra_transaction = create(:transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      statement: statement)
+
+    sign_in user
+
+    delete "/api/v1/imports/#{import_record.id}", headers: csrf_headers
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response.parsed_body.fetch("errors").join(" ")).to match(/fatura já possui lançamentos fora desta importação/i)
+    expect(Import.exists?(import_record.id)).to be(true)
+    expect(Transaction.exists?(transaction.id)).to be(true)
+    expect(Transaction.exists?(extra_transaction.id)).to be(true)
+    expect(Statement.exists?(statement.id)).to be(true)
+  end
+
   it "isolates imports by user" do
     owner = create(:user)
     stranger = create(:user)
@@ -95,6 +180,18 @@ RSpec.describe "API imports", type: :request do
     sign_in stranger
 
     get "/api/v1/imports/#{import_record.id}", headers: csrf_headers
+
+    expect(response).to have_http_status(:not_found)
+  end
+
+  it "does not allow deleting imports from another user" do
+    owner = create(:user)
+    stranger = create(:user)
+    import_record = create(:import, user: owner)
+
+    sign_in stranger
+
+    delete "/api/v1/imports/#{import_record.id}", headers: csrf_headers
 
     expect(response).to have_http_status(:not_found)
   end

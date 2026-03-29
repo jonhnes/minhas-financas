@@ -25,7 +25,7 @@ Rails.application.routes.draw do
       resources :tags, except: %i[new edit]
       resources :statements, only: %i[index show]
       resources :transactions, except: %i[new edit]
-      resources :imports, only: %i[index show create update] do
+      resources :imports, only: %i[index show create update destroy] do
         post :confirm, on: :member
       end
       resources :import_items, only: %i[update]
