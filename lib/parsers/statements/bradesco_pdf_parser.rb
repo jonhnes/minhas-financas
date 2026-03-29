@@ -63,6 +63,7 @@ module Parsers
 
         description_parts.pop if description_parts.size > 1 && description_parts.last.match?(/\A[[:alpha:]\s\.]+\z/)
         description = description_parts.join(" ").strip
+        installment_metadata = bradesco_installment_metadata(description: description, occurred_on: date)
 
         return nil if description.blank?
         return nil unless amount.to_s.match?(/[\d\.,]+/)
@@ -74,7 +75,9 @@ module Parsers
           raw_holder_name: current_holder_name,
           metadata: {
             "provider_key" => "bradesco_pdf"
-          }
+          }.tap do |metadata|
+            metadata["installment"] = installment_metadata if installment_metadata
+          end
         )
       end
     end

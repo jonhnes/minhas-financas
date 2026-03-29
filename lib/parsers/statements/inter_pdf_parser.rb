@@ -52,6 +52,7 @@ module Parsers
         occurred_on = parse_long_pt_date(columns[0])
         description = columns[1]
         amount = columns[-1]
+        installment_metadata = inter_installment_metadata(description: description, occurred_on: occurred_on)
 
         build_item(
           occurred_on: occurred_on,
@@ -60,7 +61,9 @@ module Parsers
           metadata: {
             "provider_key" => "inter_pdf",
             "card_mask" => current_card_mask
-          }
+          }.tap do |metadata|
+            metadata["installment"] = installment_metadata if installment_metadata
+          end
         )
       end
     end

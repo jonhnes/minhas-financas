@@ -3,6 +3,9 @@ module Parsers
     class UnsupportedDocumentError < StandardError; end
 
     class BasePdfParser
+      BRADESCO_INSTALLMENT_PATTERN = /\b(?<current>\d{2})\/(?<total>\d{2})\z/.freeze
+      INTER_INSTALLMENT_PATTERN = /\(PARCELA\s+(?<current>\d{2})\s+DE\s+(?<total>\d{2})\)\z/i.freeze
+
       PT_BR_MONTHS = {
         "jan" => 1,
         "fev" => 2,
@@ -101,12 +104,7 @@ module Parsers
       end
 
       def canonical_merchant_name(description)
-        normalize_text(
-          description
-            .to_s
-            .gsub(/\(PARCELA\s+\d+\s+DE\s+\d+\)/i, "")
-            .gsub(/\b\d{2}\/\d{2}\b/, "")
-        )
+        normalize_text(description_without_installment_marker(description))
       end
 
       def holder_for(raw_holder_name)
@@ -133,6 +131,43 @@ module Parsers
           status: "pending_review",
           ignored: ignored,
           metadata: metadata
+        }
+      end
+
+      def description_without_installment_marker(description)
+        description
+          .to_s
+          .gsub(INTER_INSTALLMENT_PATTERN, "")
+          .gsub(/\b\d{2}\/\d{2}\b/, "")
+          .gsub(/\s+/, " ")
+          .strip
+      end
+
+      def bradesco_installment_metadata(description:, occurred_on:)
+        build_installment_metadata(
+          match: description.to_s.strip.match(BRADESCO_INSTALLMENT_PATTERN),
+          occurred_on: occurred_on,
+          source_format: "fractional_suffix"
+        )
+      end
+
+      def inter_installment_metadata(description:, occurred_on:)
+        build_installment_metadata(
+          match: description.to_s.strip.match(INTER_INSTALLMENT_PATTERN),
+          occurred_on: occurred_on,
+          source_format: "parenthesized_parcela"
+        )
+      end
+
+      def build_installment_metadata(match:, occurred_on:, source_format:)
+        return nil unless match
+
+        {
+          "detected" => true,
+          "current_number" => match[:current].to_i,
+          "total_installments" => match[:total].to_i,
+          "purchase_occurred_on" => occurred_on.iso8601,
+          "source_format" => source_format
         }
       end
     end

@@ -14,5 +14,21 @@ RSpec.describe Parsers::Statements::BradescoPdfParser do
     expect(result.dig(:summary, :total_items)).to be > 100
     expect(result[:items].any? { |item| item[:raw_holder_name] == "MARIA VANDELUCIA CARDOSO HENRI" }).to be(true)
     expect(result[:items].first[:ignored]).to be(true)
+
+    installment_item = result[:items].find { |item| item[:description] == "PET LOVE*Order 10 01/03" }
+    non_installment_item = result[:items].find { |item| item[:description] == "IFD*BR" }
+
+    expect(installment_item).to include(
+      occurred_on: Date.new(2026, 2, 25),
+      canonical_merchant_name: "PET LOVE*ORDER 10"
+    )
+    expect(installment_item.dig(:metadata, "installment")).to eq(
+      "detected" => true,
+      "current_number" => 1,
+      "total_installments" => 3,
+      "purchase_occurred_on" => "2026-02-25",
+      "source_format" => "fractional_suffix"
+    )
+    expect(non_installment_item.dig(:metadata, "installment")).to be_nil
   end
 end

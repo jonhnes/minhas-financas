@@ -14,5 +14,21 @@ RSpec.describe Parsers::Statements::InterPdfParser do
     expect(result.dig(:summary, :total_items)).to be > 50
     expect(result[:items].first[:description]).to eq("PAGAMENTO ON LINE")
     expect(result[:items].first[:ignored]).to be(true)
+
+    installment_item = result[:items].find { |item| item[:description] == "DL *Bookingcom40741 (Parcela 08 de 10)" }
+    non_installment_item = result[:items].find { |item| item[:description] == "BISTRO DA VILA" }
+
+    expect(installment_item).to include(
+      occurred_on: Date.new(2025, 7, 2),
+      canonical_merchant_name: "DL *BOOKINGCOM40741"
+    )
+    expect(installment_item.dig(:metadata, "installment")).to eq(
+      "detected" => true,
+      "current_number" => 8,
+      "total_installments" => 10,
+      "purchase_occurred_on" => "2025-07-02",
+      "source_format" => "parenthesized_parcela"
+    )
+    expect(non_installment_item.dig(:metadata, "installment")).to be_nil
   end
 end

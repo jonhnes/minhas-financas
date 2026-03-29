@@ -7,17 +7,36 @@ RSpec.describe Imports::ConfirmImport do
     category = create(:category, user: user)
     holder = create(:card_holder, credit_card: credit_card, name: "Jonhnes Lopes Menezes")
     import_record = create(:import, user: user, credit_card: credit_card)
-    reviewed_item = create(:import_item, import: import_record, category: category, card_holder: holder, line_index: 1)
+    installment_metadata = {
+      "detected" => true,
+      "current_number" => 2,
+      "total_installments" => 5,
+      "purchase_occurred_on" => "2026-02-10",
+      "source_format" => "parenthesized_parcela"
+    }
+    reviewed_item = create(
+      :import_item,
+      import: import_record,
+      category: category,
+      card_holder: holder,
+      line_index: 1,
+      metadata: {
+        "provider_key" => "inter_pdf",
+        "installment" => installment_metadata
+      }
+    )
     ignored_item = create(:import_item, import: import_record, category: nil, ignored: true, description: "Pagamento", amount_cents: -5_000, line_index: 2)
 
     statement = described_class.new(import: import_record).call
+    transaction = statement.transactions.first
 
     expect(statement).to be_persisted
     expect(import_record.reload).to be_confirmed
     expect(import_record.statement).to eq(statement)
     expect(import_record.import_items.pluck(:status).uniq).to eq(["imported"])
     expect(statement.transactions.count).to eq(1)
-    expect(statement.transactions.first.import_item_id).to eq(reviewed_item.id)
+    expect(transaction.import_item_id).to eq(reviewed_item.id)
+    expect(transaction.metadata["installment"]).to eq(installment_metadata)
     expect(ignored_item.reload.linked_transaction_id).to be_nil
   end
 
