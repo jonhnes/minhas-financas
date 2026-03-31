@@ -3,6 +3,24 @@ module Api
     module Serializers
       module_function
 
+      def installment_payload(record, include_flags: false)
+        return nil if record.installment_group_key.blank? || record.installment_number.blank? || record.installment_total.blank? || record.purchase_occurred_on.blank?
+
+        payload = {
+          group_key: record.installment_group_key,
+          current_number: record.installment_number,
+          total_installments: record.installment_total,
+          purchase_occurred_on: record.purchase_occurred_on
+        }
+
+        if include_flags
+          payload[:detected] = record.installment_detected
+          payload[:enabled] = record.installment_enabled
+        end
+
+        payload
+      end
+
       def user(user)
         {
           id: user.id,
@@ -99,6 +117,7 @@ module Api
           canonical_merchant_name: transaction.canonical_merchant_name,
           metadata: transaction.metadata,
           auto_generated: transaction.auto_generated,
+          installment: installment_payload(transaction),
           account_name: transaction.account&.name,
           credit_card_name: transaction.credit_card&.name,
           card_holder_name: transaction.card_holder&.name,
@@ -143,7 +162,8 @@ module Api
           raw_holder_name: import_item.raw_holder_name,
           status: import_item.status,
           ignored: import_item.ignored,
-          metadata: import_item.metadata
+          metadata: import_item.metadata,
+          installment: installment_payload(import_item, include_flags: true)
         }
       end
 

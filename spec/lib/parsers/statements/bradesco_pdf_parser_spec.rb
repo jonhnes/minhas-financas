@@ -2,7 +2,8 @@ require "rails_helper"
 
 RSpec.describe Parsers::Statements::BradescoPdfParser do
   it "extracts the statement header and line items from the real PDF" do
-    credit_card = build(:credit_card, closing_day: 2, due_day: 15)
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 2, due_day: 15)
 
     result = described_class.new(
       file_path: Rails.root.join("doc", "Bradesco_Fatura-Sun Mar 22 2026 09:41:36 GMT-0300 (Horário Padrão de Brasília).pdf"),
@@ -20,8 +21,14 @@ RSpec.describe Parsers::Statements::BradescoPdfParser do
 
     expect(installment_item).to include(
       occurred_on: Date.new(2026, 2, 25),
+      installment_detected: true,
+      installment_enabled: true,
+      installment_number: 1,
+      installment_total: 3,
+      purchase_occurred_on: Date.new(2026, 2, 25),
       canonical_merchant_name: "PET LOVE*ORDER 10"
     )
+    expect(installment_item[:installment_group_key]).to be_present
     expect(installment_item.dig(:metadata, "installment")).to eq(
       "detected" => true,
       "current_number" => 1,
@@ -30,5 +37,6 @@ RSpec.describe Parsers::Statements::BradescoPdfParser do
       "source_format" => "fractional_suffix"
     )
     expect(non_installment_item.dig(:metadata, "installment")).to be_nil
+    expect(non_installment_item[:installment_detected]).to be(false)
   end
 end

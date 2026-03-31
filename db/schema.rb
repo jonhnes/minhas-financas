@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_25_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_29_193000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -139,6 +139,12 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_25_000000) do
     t.bigint "linked_transaction_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "installment_detected", default: false, null: false
+    t.boolean "installment_enabled", default: false, null: false
+    t.string "installment_group_key"
+    t.integer "installment_number"
+    t.integer "installment_total"
+    t.date "purchase_occurred_on"
     t.index ["card_holder_id"], name: "index_import_items_on_card_holder_id"
     t.index ["category_id"], name: "index_import_items_on_category_id"
     t.index ["import_id", "line_index"], name: "index_import_items_on_import_id_and_line_index", unique: true
@@ -252,6 +258,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_25_000000) do
     t.datetime "updated_at", null: false
     t.bigint "statement_id"
     t.bigint "import_item_id"
+    t.string "installment_group_key"
+    t.integer "installment_number"
+    t.integer "installment_total"
+    t.date "purchase_occurred_on"
     t.index ["account_id"], name: "index_transactions_on_account_id"
     t.index ["card_holder_id"], name: "index_transactions_on_card_holder_id"
     t.index ["category_id"], name: "index_transactions_on_category_id"
@@ -263,6 +273,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_25_000000) do
     t.index ["statement_id"], name: "index_transactions_on_statement_id"
     t.index ["transfer_account_id"], name: "index_transactions_on_transfer_account_id"
     t.index ["user_id", "impact_mode"], name: "index_transactions_on_user_id_and_impact_mode"
+    t.index ["user_id", "installment_group_key", "installment_number"], name: "index_transactions_on_user_and_installment_group", unique: true, where: "(installment_group_key IS NOT NULL)"
     t.index ["user_id", "occurred_on"], name: "index_transactions_on_user_id_and_occurred_on"
     t.index ["user_id", "transaction_type"], name: "index_transactions_on_user_id_and_transaction_type"
     t.index ["user_id"], name: "index_transactions_on_user_id"

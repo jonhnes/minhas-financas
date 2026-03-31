@@ -117,21 +117,37 @@ module Parsers
       end
 
       def build_item(occurred_on:, description:, amount_cents:, raw_holder_name: nil, metadata: {})
+        installment_metadata = metadata["installment"]
+        canonical_name = canonical_merchant_name(description)
+        structured_installment_attributes =
+          if installment_metadata.present?
+            Installments::Support.build_import_item_attributes(
+              credit_card_id: credit_card.id,
+              canonical_merchant_name: canonical_name,
+              purchase_occurred_on: installment_metadata["purchase_occurred_on"] || occurred_on,
+              amount_cents: amount_cents,
+              installment_number: installment_metadata["current_number"],
+              installment_total: installment_metadata["total_installments"]
+            )
+          else
+            Installments::Support.default_import_item_attributes
+          end
+
         ignored = amount_cents.negative? || description.match?(/pagamento|pag boleto/i)
         {
-          occurred_on: occurred_on,
+          occurred_on: structured_installment_attributes[:occurred_on] || occurred_on,
           description: description.strip,
           amount_cents: amount_cents,
           transaction_type: "expense",
           impact_mode: ignored ? "informational" : "normal",
           category_id: nil,
           card_holder_id: holder_for(raw_holder_name)&.id,
-          canonical_merchant_name: canonical_merchant_name(description),
+          canonical_merchant_name: canonical_name,
           raw_holder_name: raw_holder_name,
           status: "pending_review",
           ignored: ignored,
           metadata: metadata
-        }
+        }.merge(structured_installment_attributes.except(:occurred_on))
       end
 
       def description_without_installment_marker(description)

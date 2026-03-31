@@ -36,8 +36,35 @@ RSpec.describe "API imports", type: :request do
     user = create(:user)
     credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
     category = create(:category, user: user)
+    installment_group_key = Installments::Support.group_key(
+      credit_card_id: credit_card.id,
+      canonical_merchant_name: "MERCADO REVISADO",
+      purchase_occurred_on: Date.new(2026, 2, 10),
+      amount_cents: 12_390,
+      installment_total: 2
+    )
     import_record = create(:import, user: user, credit_card: credit_card)
-    import_item = create(:import_item, import: import_record, category: nil)
+    import_item = create(:import_item,
+      import: import_record,
+      category: nil,
+      occurred_on: Date.new(2026, 3, 10),
+      description: "Mercado revisado",
+      canonical_merchant_name: "MERCADO REVISADO",
+      installment_detected: true,
+      installment_enabled: true,
+      installment_group_key: installment_group_key,
+      installment_number: 2,
+      installment_total: 2,
+      purchase_occurred_on: Date.new(2026, 2, 10),
+      metadata: {
+        "installment" => {
+          "detected" => true,
+          "current_number" => 2,
+          "total_installments" => 2,
+          "purchase_occurred_on" => "2026-02-10",
+          "source_format" => "parenthesized_parcela"
+        }
+      })
 
     sign_in user
     headers = csrf_headers
@@ -45,6 +72,14 @@ RSpec.describe "API imports", type: :request do
     get "/api/v1/imports/#{import_record.id}", headers: headers
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body.dig("data", "items", 0, "id")).to eq(import_item.id)
+    expect(response.parsed_body.dig("data", "items", 0, "installment")).to include(
+      "detected" => true,
+      "enabled" => true,
+      "group_key" => installment_group_key,
+      "current_number" => 2,
+      "total_installments" => 2,
+      "purchase_occurred_on" => "2026-02-10"
+    )
 
     patch "/api/v1/imports/#{import_record.id}",
       params: {
@@ -68,13 +103,15 @@ RSpec.describe "API imports", type: :request do
           amount_cents: 12_390,
           category_id: category.id,
           impact_mode: "normal",
-          ignored: false
+          ignored: false,
+          installment_enabled: false
         }
       }.to_json,
       headers: headers.merge("CONTENT_TYPE" => "application/json")
 
     expect(response).to have_http_status(:ok)
     expect(import_item.reload.category_id).to eq(category.id)
+    expect(import_item.reload.installment_enabled).to be(false)
 
     post "/api/v1/imports/#{import_record.id}/confirm", headers: headers
 
@@ -121,6 +158,13 @@ RSpec.describe "API imports", type: :request do
       statement: statement,
       import_item: import_item)
     import_item.update!(linked_transaction: transaction)
+    future_placeholder = create(:transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      auto_generated: true,
+      metadata: { "generated_from_import_id" => import_record.id })
 
     sign_in user
 
@@ -130,6 +174,7 @@ RSpec.describe "API imports", type: :request do
     expect(Import.exists?(import_record.id)).to be(false)
     expect(ImportItem.exists?(import_item.id)).to be(false)
     expect(Transaction.exists?(transaction.id)).to be(false)
+    expect(Transaction.exists?(future_placeholder.id)).to be(false)
     expect(Statement.exists?(statement.id)).to be(false)
   end
 

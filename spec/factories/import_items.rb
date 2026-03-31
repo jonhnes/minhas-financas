@@ -15,5 +15,11 @@ FactoryBot.define do
     ignored { false }
     metadata { {} }
     linked_transaction_id { nil }
+    installment_detected { false }
+    installment_enabled { false }
+    installment_group_key { nil }
+    installment_number { nil }
+    installment_total { nil }
+    purchase_occurred_on { nil }
   end
 end

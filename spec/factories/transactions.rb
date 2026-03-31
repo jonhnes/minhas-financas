@@ -16,6 +16,10 @@ FactoryBot.define do
     canonical_merchant_name { "Merchant" }
     metadata { {} }
     auto_generated { false }
+    installment_group_key { nil }
+    installment_number { nil }
+    installment_total { nil }
+    purchase_occurred_on { nil }
 
     trait :income do
       transaction_type { "income" }

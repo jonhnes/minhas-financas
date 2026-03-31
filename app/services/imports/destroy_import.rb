@@ -25,11 +25,16 @@ module Imports
     def destroy_confirmed_import!
       statement = import.statement
       linked_transactions = import.import_items.includes(:linked_transaction).filter_map(&:linked_transaction)
+      generated_future_transactions = import.user.transactions.where(
+        auto_generated: true,
+        import_item_id: nil
+      ).where("metadata ->> 'generated_from_import_id' = ?", import.id.to_s).to_a
 
       ensure_safe_statement_rollback!(statement, linked_transactions)
 
       import.import_items.update_all(linked_transaction_id: nil, updated_at: Time.current)
       linked_transactions.each(&:destroy!)
+      generated_future_transactions.each(&:destroy!)
       import.update!(statement: nil)
       import.destroy!
       statement&.destroy!

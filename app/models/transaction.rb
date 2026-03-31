@@ -31,6 +31,7 @@ class Transaction < ApplicationRecord
   validate :source_presence
   validate :transfer_consistency
   validate :category_presence_for_financial_transaction
+  validate :installment_fields_consistency
 
   scope :chronological, -> { order(occurred_on: :desc, created_at: :desc) }
   scope :for_reports, -> { where.not(impact_mode: %w[third_party informational]) }
@@ -61,6 +62,20 @@ class Transaction < ApplicationRecord
   end
 
   private
+
+  def installment_fields_consistency
+    has_installment_fields = installment_group_key.present? || installment_number.present? || installment_total.present? || purchase_occurred_on.present?
+    return unless has_installment_fields
+
+    if installment_group_key.blank? || installment_number.blank? || installment_total.blank? || purchase_occurred_on.blank?
+      errors.add(:base, "Transação parcelada exige grupo, número, total e data da compra")
+      return
+    end
+
+    return if Installments::Support.valid_installment_numbers?(installment_number, installment_total)
+
+    errors.add(:base, "Transação parcelada precisa ter número e total válidos")
+  end
 
   def source_presence
     if account_id.blank? && credit_card_id.blank?

@@ -2,7 +2,8 @@ require "rails_helper"
 
 RSpec.describe Parsers::Statements::InterPdfParser do
   it "extracts the statement header and line items from the real PDF" do
-    credit_card = build(:credit_card, closing_day: 28, due_day: 5)
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
 
     result = described_class.new(
       file_path: Rails.root.join("doc", "inter.pdf"),
@@ -19,9 +20,15 @@ RSpec.describe Parsers::Statements::InterPdfParser do
     non_installment_item = result[:items].find { |item| item[:description] == "BISTRO DA VILA" }
 
     expect(installment_item).to include(
-      occurred_on: Date.new(2025, 7, 2),
+      occurred_on: Date.new(2026, 2, 2),
+      installment_detected: true,
+      installment_enabled: true,
+      installment_number: 8,
+      installment_total: 10,
+      purchase_occurred_on: Date.new(2025, 7, 2),
       canonical_merchant_name: "DL *BOOKINGCOM40741"
     )
+    expect(installment_item[:installment_group_key]).to be_present
     expect(installment_item.dig(:metadata, "installment")).to eq(
       "detected" => true,
       "current_number" => 8,
@@ -30,5 +37,6 @@ RSpec.describe Parsers::Statements::InterPdfParser do
       "source_format" => "parenthesized_parcela"
     )
     expect(non_installment_item.dig(:metadata, "installment")).to be_nil
+    expect(non_installment_item[:installment_detected]).to be(false)
   end
 end
