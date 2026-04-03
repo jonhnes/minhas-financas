@@ -2,10 +2,28 @@ require "digest"
 
 module Installments
   module Support
+    BRADESCO_INSTALLMENT_MARKER_PATTERN = /\b\d{2}\/\d{2}\b/.freeze
+    INTER_INSTALLMENT_MARKER_PATTERN = /\(PARCELA\s+\d{2}\s+DE\s+\d{2}\)\z/i.freeze
+
     module_function
 
     def normalize_merchant_name(name)
       ActiveSupport::Inflector.transliterate(name.to_s).upcase.gsub(/\s+/, " ").strip
+    end
+
+    def description_without_installment_marker(description)
+      description
+        .to_s
+        .gsub(INTER_INSTALLMENT_MARKER_PATTERN, "")
+        .gsub(BRADESCO_INSTALLMENT_MARKER_PATTERN, "")
+        .gsub(/\s+/, " ")
+        .strip
+    end
+
+    def future_installment_description(description:, canonical_merchant_name:)
+      canonical_merchant_name.presence ||
+        description_without_installment_marker(description).presence ||
+        description.to_s.strip
     end
 
     def group_key(credit_card_id:, canonical_merchant_name:, purchase_occurred_on:, amount_cents:, installment_total:)

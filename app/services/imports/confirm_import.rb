@@ -192,11 +192,20 @@ module Imports
         impact_mode: item.impact_mode,
         amount_cents: item.amount_cents,
         occurred_on: occurred_on,
-        description: item.description,
+        description: transaction_description_for(item, auto_generated: auto_generated),
         canonical_merchant_name: item.canonical_merchant_name,
         metadata: metadata || build_transaction_metadata(item, installment_number: item.installment_number, auto_generated: auto_generated),
         auto_generated: auto_generated
       }.merge(extra_attributes)
+    end
+
+    def transaction_description_for(item, auto_generated:)
+      return item.description unless auto_generated && item.installment_active?
+
+      Installments::Support.future_installment_description(
+        description: item.description,
+        canonical_merchant_name: item.canonical_merchant_name
+      )
     end
 
     def build_transaction_metadata(item, installment_number:, auto_generated:)

@@ -45,6 +45,7 @@ RSpec.describe Imports::ConfirmImport do
       card_holder: holder,
       line_index: 1,
       occurred_on: Date.new(2026, 3, 10),
+      description: "Mercado da importação 02/05",
       installment_detected: true,
       installment_enabled: true,
       installment_group_key: installment_group_key,
@@ -69,6 +70,7 @@ RSpec.describe Imports::ConfirmImport do
     expect(statement.transactions.count).to eq(1)
     expect(current_transaction.import_item_id).to eq(reviewed_item.id)
     expect(current_transaction.occurred_on).to eq(Date.new(2026, 3, 10))
+    expect(current_transaction.description).to eq("Mercado da importação 02/05")
     expect(current_transaction.installment_group_key).to eq(installment_group_key)
     expect(current_transaction.installment_number).to eq(2)
     expect(current_transaction.installment_total).to eq(5)
@@ -84,6 +86,11 @@ RSpec.describe Imports::ConfirmImport do
       Date.new(2026, 4, 10),
       Date.new(2026, 5, 10),
       Date.new(2026, 6, 10)
+    ])
+    expect(future_transactions.pluck(:description)).to eq([
+      "MERCADO DA IMPORTACAO",
+      "MERCADO DA IMPORTACAO",
+      "MERCADO DA IMPORTACAO"
     ])
     expect(ignored_item.reload.linked_transaction_id).to be_nil
   end
@@ -172,6 +179,67 @@ RSpec.describe Imports::ConfirmImport do
     expect(placeholder.description).to eq("Mercado da importação")
     expect(placeholder.metadata["import_id"]).to eq(current_import.id)
     expect(placeholder.metadata["provider_key"]).to eq("inter_pdf")
+  end
+
+  it "falls back to a cleaned description for future installments when canonical merchant is missing" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    category = create(:category, user: user)
+    import_record = create(:import,
+      user: user,
+      credit_card: credit_card,
+      parsed_payload: {
+        "statement" => {
+          "period_start" => "2026-03-01",
+          "period_end" => "2026-03-31",
+          "due_date" => "2026-04-05",
+          "total_amount_cents" => 25_178,
+          "status" => "open",
+          "metadata" => {}
+        },
+        "summary" => {
+          "total_items" => 1,
+          "ignored_items" => 0,
+          "reviewable_items" => 1
+        }
+      })
+    installment_group_key = SecureRandom.hex(16)
+    import_item = create(:import_item,
+      import: import_record,
+      category: category,
+      description: "PET LOVE*Order 10 01/03",
+      canonical_merchant_name: nil,
+      amount_cents: 12_590,
+      occurred_on: Date.new(2026, 3, 25),
+      installment_detected: true,
+      installment_enabled: true,
+      installment_group_key: installment_group_key,
+      installment_number: 1,
+      installment_total: 3,
+      purchase_occurred_on: Date.new(2026, 3, 25),
+      metadata: {
+        "provider_key" => "bradesco_pdf",
+        "installment" => {
+          "detected" => true,
+          "current_number" => 1,
+          "total_installments" => 3,
+          "purchase_occurred_on" => "2026-03-25",
+          "source_format" => "fractional_suffix"
+        }
+      })
+
+    described_class.new(import: import_record).call
+
+    future_transactions = user.transactions.where(
+      installment_group_key: installment_group_key,
+      auto_generated: true
+    ).order(:installment_number)
+
+    expect(future_transactions.pluck(:description)).to eq([
+      "PET LOVE*Order 10",
+      "PET LOVE*Order 10"
+    ])
+    expect(import_item.reload.description).to eq("PET LOVE*Order 10 01/03")
   end
 
   it "confirms a parcelado even when its theoretical occurrence falls outside the imported statement cycle" do

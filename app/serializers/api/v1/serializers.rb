@@ -97,6 +97,20 @@ module Api
         }
       end
 
+      def category_suggestion_rule(rule)
+        {
+          id: rule.id,
+          user_id: rule.user_id,
+          category_id: rule.category_id,
+          category_name: rule.category&.name,
+          match_type: rule.match_type,
+          pattern: rule.pattern,
+          normalized_pattern: rule.normalized_pattern,
+          active: rule.active,
+          position: rule.position
+        }
+      end
+
       def transaction(transaction)
         {
           id: transaction.id,

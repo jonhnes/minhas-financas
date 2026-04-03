@@ -22,6 +22,8 @@ Rails.application.routes.draw do
         resources :card_holders, except: %i[new edit], shallow: true
       end
       resources :categories, except: %i[new edit]
+      resources :category_suggestion_rules, except: %i[new edit]
+      resources :category_suggestions, only: %i[create]
       resources :tags, except: %i[new edit]
       resources :statements, only: %i[index show]
       resources :transactions, except: %i[new edit]

@@ -151,12 +151,7 @@ module Parsers
       end
 
       def description_without_installment_marker(description)
-        description
-          .to_s
-          .gsub(INTER_INSTALLMENT_PATTERN, "")
-          .gsub(/\b\d{2}\/\d{2}\b/, "")
-          .gsub(/\s+/, " ")
-          .strip
+        Installments::Support.description_without_installment_marker(description)
       end
 
       def bradesco_installment_metadata(description:, occurred_on:)

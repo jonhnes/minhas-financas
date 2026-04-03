@@ -4,6 +4,7 @@ class Category < ApplicationRecord
 
   has_many :children, class_name: "Category", foreign_key: :parent_id, dependent: :nullify, inverse_of: :parent
   has_many :budgets, dependent: :restrict_with_exception
+  has_many :category_suggestion_rules, dependent: :nullify
   has_many :transactions, dependent: :nullify
 
   validates :name, presence: true

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_29_193000) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_31_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -101,6 +101,22 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_29_193000) do
     t.index ["system"], name: "index_categories_on_system"
     t.index ["user_id", "parent_id", "name"], name: "index_categories_on_user_id_and_parent_id_and_name", unique: true
     t.index ["user_id"], name: "index_categories_on_user_id"
+  end
+
+  create_table "category_suggestion_rules", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "category_id"
+    t.string "match_type", null: false
+    t.string "pattern", null: false
+    t.string "normalized_pattern", null: false
+    t.boolean "active", default: true, null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id"], name: "index_category_suggestion_rules_on_category_id"
+    t.index ["user_id", "active", "position"], name: "index_category_suggestion_rules_on_user_active_position"
+    t.index ["user_id", "normalized_pattern"], name: "index_category_suggestion_rules_on_user_normalized_pattern"
+    t.index ["user_id"], name: "index_category_suggestion_rules_on_user_id"
   end
 
   create_table "credit_cards", force: :cascade do |t|
@@ -305,6 +321,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_29_193000) do
   add_foreign_key "card_holders", "credit_cards"
   add_foreign_key "categories", "categories", column: "parent_id"
   add_foreign_key "categories", "users"
+  add_foreign_key "category_suggestion_rules", "categories", on_delete: :nullify
+  add_foreign_key "category_suggestion_rules", "users"
   add_foreign_key "credit_cards", "accounts", column: "payment_account_id"
   add_foreign_key "credit_cards", "users"
   add_foreign_key "import_items", "card_holders"
