@@ -21,7 +21,7 @@ module Reports
           end
         end
 
-      range.step(range.end, 1.month).map do |month|
+      each_month_in_range(range).map do |month|
         grouped[month.beginning_of_month]
       end
     end
@@ -38,6 +38,18 @@ module Reports
       end_month = params[:month].present? ? Date.parse("#{params[:month]}-01").end_of_month : Time.zone.today.end_of_month
       start_month = (end_month - 5.months).beginning_of_month
       start_month..end_month
+    end
+
+    def each_month_in_range(range)
+      current_month = range.begin.beginning_of_month
+      months = []
+
+      while current_month <= range.end
+        months << current_month
+        current_month = current_month.next_month
+      end
+
+      months
     end
 
     def include_third_party?
