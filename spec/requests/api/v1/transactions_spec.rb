@@ -38,6 +38,65 @@ RSpec.describe "API transactions", type: :request do
     expect(response.parsed_body.dig("data", "monthly_expense_cents")).to eq(12_500)
   end
 
+  it "optionally excludes third party transactions while preserving informational entries and ordering" do
+    user = create(:user)
+    account = create(:account, user: user)
+    category = create(:category, user: user, name: "Compras")
+
+    future_normal = create(
+      :transaction,
+      user: user,
+      account: account,
+      category: category,
+      impact_mode: "normal",
+      description: "Futuro",
+      occurred_on: Date.new(2026, 3, 28)
+    )
+    third_party = create(
+      :transaction,
+      :third_party,
+      user: user,
+      account: account,
+      category: category,
+      description: "Terceiros",
+      occurred_on: Date.new(2026, 3, 25)
+    )
+    informational = create(
+      :transaction,
+      user: user,
+      account: account,
+      category: category,
+      impact_mode: "informational",
+      description: "Informativo",
+      occurred_on: Date.new(2026, 3, 24)
+    )
+    normal = create(
+      :transaction,
+      user: user,
+      account: account,
+      category: category,
+      impact_mode: "normal",
+      description: "Normal",
+      occurred_on: Date.new(2026, 3, 23)
+    )
+
+    sign_in user
+
+    get "/api/v1/transactions", params: { occurred_to: "2026-03-25" }, as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([third_party.id, informational.id, normal.id])
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("impact_mode") }).to include("third_party", "informational")
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).not_to include(future_normal.id)
+
+    get "/api/v1/transactions", params: { occurred_to: "2026-03-25", exclude_third_party: true }, as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([informational.id, normal.id])
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("impact_mode") }).to include("informational")
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("impact_mode") }).not_to include("third_party")
+  end
+
   it "keeps the default chronological ordering when no sort params are provided" do
     user = create(:user)
     account = create(:account, user: user)

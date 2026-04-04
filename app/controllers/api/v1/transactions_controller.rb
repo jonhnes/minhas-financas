@@ -94,6 +94,7 @@ module Api
         scope = scope.where(category_id: params[:category_id]) if params[:category_id].present?
         scope = scope.where(statement_id: params[:statement_id]) if params[:statement_id].present?
         scope = scope.where(impact_mode: params[:impact_mode]) if params[:impact_mode].present?
+        scope = scope.where.not(impact_mode: "third_party") if exclude_third_party?
         scope = scope.where(transaction_type: params[:transaction_type]) if params[:transaction_type].present?
         scope = scope.where("occurred_on >= ?", params[:occurred_from]) if params[:occurred_from].present?
         scope = scope.where("occurred_on <= ?", params[:occurred_to]) if params[:occurred_to].present?
@@ -125,6 +126,10 @@ module Api
         else
           scope.reorder(occurred_on: sort_direction.to_sym, created_at: :desc)
         end
+      end
+
+      def exclude_third_party?
+        ActiveModel::Type::Boolean.new.cast(params[:exclude_third_party])
       end
     end
   end

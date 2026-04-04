@@ -27,7 +27,8 @@ module Reports
       @filtered_transactions ||= Reports::FilteredTransactionsQuery.new(
         user: user,
         params: params,
-        scope: user.transactions.includes(:category)
+        scope: user.transactions.includes(:category),
+        use_month: true
       )
     end
 
