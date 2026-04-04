@@ -1,6 +1,6 @@
 class User < ApplicationRecord
   TRANSACTIONS_TABLE_COLUMN_ORDER = %w[impact date description category source amount].freeze
-  TRANSACTIONS_TABLE_SORT_KEYS = %w[occurred_on category_name].freeze
+  TRANSACTIONS_TABLE_SORT_KEYS = %w[occurred_on description category_name source_name amount_cents].freeze
   TRANSACTIONS_TABLE_SORT_DIRECTIONS = %w[asc desc].freeze
   TRANSACTIONS_TABLE_IMPACT_MODES = %w[all normal third_party off_budget informational].freeze
   DEFAULT_TRANSACTIONS_TABLE_SORT = {

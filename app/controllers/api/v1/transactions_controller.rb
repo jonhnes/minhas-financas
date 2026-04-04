@@ -1,7 +1,7 @@
 module Api
   module V1
     class TransactionsController < BaseController
-      SORTABLE_FIELDS = %w[occurred_on category_name].freeze
+      SORTABLE_FIELDS = %w[occurred_on description category_name source_name amount_cents].freeze
       SORT_DIRECTIONS = %w[asc desc].freeze
 
       before_action :set_transaction, only: %i[show update destroy]
@@ -114,6 +114,14 @@ module Api
           scope
             .left_outer_joins(:category)
             .reorder(Arel.sql("LOWER(categories.name) #{sort_direction.upcase} NULLS LAST"), occurred_on: :desc, created_at: :desc)
+        when "description"
+          scope.reorder(Arel.sql("LOWER(transactions.description) #{sort_direction.upcase}"), occurred_on: :desc, created_at: :desc)
+        when "source_name"
+          scope
+            .left_outer_joins(:account, :credit_card)
+            .reorder(Arel.sql("LOWER(COALESCE(accounts.name, credit_cards.name)) #{sort_direction.upcase} NULLS LAST"), occurred_on: :desc, created_at: :desc)
+        when "amount_cents"
+          scope.reorder(amount_cents: sort_direction.to_sym, occurred_on: :desc, created_at: :desc)
         else
           scope.reorder(occurred_on: sort_direction.to_sym, created_at: :desc)
         end

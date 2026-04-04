@@ -94,4 +94,57 @@ RSpec.describe "API transactions", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([zulu_transaction.id, beta_transaction.id, alpha_transaction.id])
   end
+
+  it "orders transactions by description ascending" do
+    user = create(:user)
+    account = create(:account, user: user)
+    category = create(:category, user: user, name: "Compras")
+
+    zulu = create(:transaction, user: user, account: account, category: category, description: "Zulu", occurred_on: Date.new(2026, 3, 25))
+    alpha = create(:transaction, user: user, account: account, category: category, description: "Alpha", occurred_on: Date.new(2026, 3, 3))
+    beta = create(:transaction, user: user, account: account, category: category, description: "Beta", occurred_on: Date.new(2026, 3, 14))
+
+    sign_in user
+
+    get "/api/v1/transactions", params: { sort_by: "description", sort_direction: "asc" }, as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([alpha.id, beta.id, zulu.id])
+  end
+
+  it "orders transactions by source name ascending across accounts and cards" do
+    user = create(:user)
+    alpha_account = create(:account, user: user, name: "Alpha Conta")
+    zulu_account = create(:account, user: user, name: "Zulu Conta")
+    beta_card = create(:credit_card, user: user, name: "Beta Card")
+    category = create(:category, user: user, name: "Compras")
+
+    zulu_transaction = create(:transaction, user: user, account: zulu_account, category: category, description: "Conta zulu", occurred_on: Date.new(2026, 3, 25))
+    alpha_transaction = create(:transaction, user: user, account: alpha_account, category: category, description: "Conta alpha", occurred_on: Date.new(2026, 3, 3))
+    beta_transaction = create(:transaction, :credit_card_purchase, user: user, credit_card: beta_card, category: category, description: "Cartão beta", occurred_on: Date.new(2026, 3, 14))
+
+    sign_in user
+
+    get "/api/v1/transactions", params: { sort_by: "source_name", sort_direction: "asc" }, as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([alpha_transaction.id, beta_transaction.id, zulu_transaction.id])
+  end
+
+  it "orders transactions by amount ascending" do
+    user = create(:user)
+    account = create(:account, user: user)
+    category = create(:category, user: user, name: "Compras")
+
+    highest = create(:transaction, user: user, account: account, category: category, amount_cents: 25_00, description: "Maior", occurred_on: Date.new(2026, 3, 25))
+    lowest = create(:transaction, user: user, account: account, category: category, amount_cents: 5_00, description: "Menor", occurred_on: Date.new(2026, 3, 3))
+    middle = create(:transaction, user: user, account: account, category: category, amount_cents: 14_00, description: "Meio", occurred_on: Date.new(2026, 3, 14))
+
+    sign_in user
+
+    get "/api/v1/transactions", params: { sort_by: "amount_cents", sort_direction: "asc" }, as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([lowest.id, middle.id, highest.id])
+  end
 end

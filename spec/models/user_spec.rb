@@ -22,7 +22,7 @@ RSpec.describe User, type: :model do
           transactions_table: {
             column_order: %w[amount description invalid amount],
             sort: {
-              key: "category_name",
+              key: "source_name",
               direction: "asc"
             },
             impact_mode: "third_party"
@@ -38,7 +38,7 @@ RSpec.describe User, type: :model do
           "transactions_table" => {
             "column_order" => %w[amount description impact date category source],
             "sort" => {
-              "key" => "category_name",
+              "key" => "source_name",
               "direction" => "asc"
             },
             "impact_mode" => "third_party"
@@ -98,7 +98,7 @@ RSpec.describe User, type: :model do
           transactions_table: {
             column_order: %w[amount impact],
             sort: {
-              key: "category_name",
+              key: "amount_cents",
               direction: "desc"
             }
           }
@@ -114,7 +114,7 @@ RSpec.describe User, type: :model do
             "impact_mode" => "all",
             "column_order" => %w[amount impact date description category source],
             "sort" => {
-              "key" => "category_name",
+              "key" => "amount_cents",
               "direction" => "desc"
             }
           }
