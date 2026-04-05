@@ -57,6 +57,6 @@ test:
 #
 production:
   <<: *default
-  database: <%= ENV.fetch("DB_PRODUCTION_NAME", "minhas_financas_production") %>
-  username: <%= ENV.fetch("DB_PRODUCTION_USERNAME", "minhas_financas") %>
-  password: <%= ENV["MINHAS_FINANCAS_DATABASE_PASSWORD"] %>
+  database: <%= ENV.fetch("POSTGRES_DB", ENV.fetch("DB_PRODUCTION_NAME", "minhas_financas_production")) %>
+  username: <%= ENV.fetch("POSTGRES_USER", ENV.fetch("DB_PRODUCTION_USERNAME", "minhas_financas")) %>
+  password: <%= ENV.fetch("POSTGRES_PASSWORD", ENV["MINHAS_FINANCAS_DATABASE_PASSWORD"]) %>

@@ -1,0 +1,103 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: true
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: minhas_financas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d minhas_financas_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      RAILS_ENV: test
+      FRONTEND_ORIGIN: http://localhost:5173
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_TEST_NAME: minhas_financas_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libpq-dev rsync
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+
+      - name: Prepare test database
+        run: bin/rails db:prepare
+
+      - name: Run backend test suite
+        run: bundle exec rspec
+
+      - name: Configure SSH key
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure remote directories exist
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p /opt/minhas-financas/backend /opt/minhas-financas/frontend-dist /opt/minhas-financas/env"
+
+      - name: Sync backend repository
+        run: |
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.idea/' \
+            --exclude 'coverage/' \
+            --exclude 'log/' \
+            --exclude 'storage/' \
+            --exclude 'tmp/' \
+            --exclude 'vendor/bundle/' \
+            -e "ssh -p $SSH_PORT" \
+            ./ "$SSH_USER@$SSH_HOST:/opt/minhas-financas/backend/"
+
+      - name: Deploy on Hetzner
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "cd /opt/minhas-financas/backend && ./script/deploy_production.sh"

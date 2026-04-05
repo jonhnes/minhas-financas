@@ -1,5 +1,6 @@
-:concurrency: 5
+:concurrency: <%= Integer(ENV.fetch("SIDEKIQ_CONCURRENCY", 5)) %>
 :queues:
+  - imports
   - default
   - recurring
 

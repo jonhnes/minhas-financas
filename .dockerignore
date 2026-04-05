@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+.DS_Store
+.env
+.env.*
+coverage
+doc
+log
+node_modules
+storage
+tmp
+vendor/bundle
+spec
+docker-compose.yml
