@@ -1,7 +1,9 @@
 class ApplicationController < ActionController::Base
   include Pundit::Authorization
+  include Api::V1::MobileBearerAuthentication
 
   protect_from_forgery with: :exception
+  skip_forgery_protection if: :bearer_token_request?
 
   rescue_from ActiveRecord::RecordInvalid, with: :render_unprocessable_entity
   rescue_from ActiveRecord::RecordNotFound, with: :render_not_found

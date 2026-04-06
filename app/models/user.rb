@@ -19,6 +19,7 @@ class User < ApplicationRecord
   has_many :category_suggestion_rules, dependent: :destroy
   has_many :credit_cards, dependent: :destroy
   has_many :imports, dependent: :destroy
+  has_many :mobile_sessions, dependent: :destroy
   has_many :recurring_rules, dependent: :destroy
   has_many :tags, dependent: :destroy
   has_many :transactions, dependent: :destroy

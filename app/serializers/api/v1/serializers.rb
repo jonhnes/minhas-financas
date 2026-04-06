@@ -34,6 +34,27 @@ module Api
         }
       end
 
+      def user_onboarding(user)
+        {
+          has_account: user.accounts.exists?,
+          has_credit_card: user.credit_cards.exists?,
+          completed: user.onboarding_completed?
+        }
+      end
+
+      def user_with_onboarding(user)
+        user(user).merge(onboarding: user_onboarding(user))
+      end
+
+      def mobile_auth_session(session, access_token:, refresh_token:)
+        {
+          access_token: access_token,
+          refresh_token: refresh_token,
+          expires_at: session.expires_at,
+          user: user_with_onboarding(session.user)
+        }
+      end
+
       def account(account)
         {
           id: account.id,

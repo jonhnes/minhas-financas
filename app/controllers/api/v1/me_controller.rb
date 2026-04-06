@@ -5,13 +5,7 @@ module Api
         authorize current_user, policy_class: UserPolicy
 
         render json: {
-          data: Api::V1::Serializers.user(current_user).merge(
-            onboarding: {
-              has_account: current_user.accounts.exists?,
-              has_credit_card: current_user.credit_cards.exists?,
-              completed: current_user.onboarding_completed?
-            }
-          )
+          data: Api::V1::Serializers.user_with_onboarding(current_user)
         }
       end
 

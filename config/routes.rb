@@ -10,6 +10,15 @@ Rails.application.routes.draw do
         get :csrf, to: "csrf_tokens#show"
       end
 
+      namespace :mobile do
+        namespace :auth do
+          post "sign_up", to: "registrations#create"
+          post "sign_in", to: "sessions#create"
+          post "refresh", to: "tokens#create"
+          delete "sign_out", to: "tokens#destroy"
+        end
+      end
+
       devise_scope :user do
         post "auth/sign_up", to: "auth/registrations#create"
         post "auth/sign_in", to: "auth/sessions#create"

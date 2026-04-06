@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_31_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_05_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -191,6 +191,25 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_31_120000) do
     t.index ["user_id"], name: "index_imports_on_user_id"
   end
 
+  create_table "mobile_sessions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "access_token_digest", null: false
+    t.string "refresh_token_digest", null: false
+    t.string "platform"
+    t.string "device_label"
+    t.datetime "expires_at", null: false
+    t.datetime "refresh_expires_at", null: false
+    t.datetime "last_used_at"
+    t.datetime "revoked_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["access_token_digest"], name: "index_mobile_sessions_on_access_token_digest", unique: true
+    t.index ["refresh_expires_at"], name: "index_mobile_sessions_on_refresh_expires_at"
+    t.index ["refresh_token_digest"], name: "index_mobile_sessions_on_refresh_token_digest", unique: true
+    t.index ["user_id", "revoked_at"], name: "index_mobile_sessions_on_user_id_and_revoked_at"
+    t.index ["user_id"], name: "index_mobile_sessions_on_user_id"
+  end
+
   create_table "recurring_rules", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "account_id"
@@ -332,6 +351,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_31_120000) do
   add_foreign_key "imports", "credit_cards"
   add_foreign_key "imports", "statements"
   add_foreign_key "imports", "users"
+  add_foreign_key "mobile_sessions", "users"
   add_foreign_key "recurring_rules", "accounts"
   add_foreign_key "recurring_rules", "card_holders"
   add_foreign_key "recurring_rules", "categories"
