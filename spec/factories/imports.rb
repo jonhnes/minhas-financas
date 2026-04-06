@@ -30,15 +30,16 @@ FactoryBot.define do
     confirmed_at { nil }
 
     transient do
-      source_file_path { Rails.root.join("doc", "inter.pdf") }
+      # Real PDFs under doc/ stay local-only for manual parser debugging.
+      source_file_path { Rails.root.join("spec", "fixtures", "files", "test.pdf") }
     end
 
     after(:build) do |import_record, evaluator|
       next if import_record.source_file.attached?
 
       import_record.source_file.attach(
-        io: File.open(evaluator.source_file_path),
-        filename: File.basename(evaluator.source_file_path),
+        io: File.open(evaluator.source_file_path, "rb"),
+        filename: File.basename(evaluator.source_file_path.to_s),
         content_type: "application/pdf"
       )
     end

@@ -1,6 +1,11 @@
 require "rails_helper"
 
 RSpec.describe "API imports", type: :request do
+  # Real PDFs under doc/ stay local-only for manual parser debugging; CI uses tracked fixtures.
+  def test_pdf_fixture_path
+    Rails.root.join("spec", "fixtures", "files", "test.pdf")
+  end
+
   def csrf_headers
     get "/api/v1/auth/csrf", as: :json
     {
@@ -12,15 +17,95 @@ RSpec.describe "API imports", type: :request do
   it "uploads a PDF and produces a reviewable import" do
     user = create(:user)
     credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    installment_group_key = Installments::Support.group_key(
+      credit_card_id: credit_card.id,
+      canonical_merchant_name: "RESERVA TESTE",
+      purchase_occurred_on: Date.new(2025, 7, 2),
+      amount_cents: 35_000,
+      installment_total: 10
+    )
+    parser_result = {
+      statement: {
+        period_start: Date.new(2026, 1, 29),
+        period_end: Date.new(2026, 2, 28),
+        due_date: Date.new(2026, 3, 5),
+        total_amount_cents: 649_417,
+        status: "open",
+        metadata: { "provider_key" => "inter_pdf" }
+      },
+      summary: {
+        total_items: 2,
+        ignored_items: 1,
+        reviewable_items: 1
+      },
+      items: [
+        {
+          line_index: 1,
+          occurred_on: Date.new(2026, 2, 1),
+          description: "PAGAMENTO ON LINE",
+          amount_cents: 12_000,
+          transaction_type: "expense",
+          impact_mode: "informational",
+          category_id: nil,
+          card_holder_id: nil,
+          canonical_merchant_name: "PAGAMENTO ON LINE",
+          raw_holder_name: nil,
+          status: "pending_review",
+          ignored: true,
+          metadata: { "provider_key" => "inter_pdf", "card_mask" => "4321" },
+          installment_detected: false,
+          installment_enabled: false,
+          installment_group_key: nil,
+          installment_number: nil,
+          installment_total: nil,
+          purchase_occurred_on: nil
+        },
+        {
+          line_index: 2,
+          occurred_on: Date.new(2026, 2, 2),
+          description: "RESERVA TESTE (Parcela 08 de 10)",
+          amount_cents: 35_000,
+          transaction_type: "expense",
+          impact_mode: "normal",
+          category_id: nil,
+          card_holder_id: nil,
+          canonical_merchant_name: "RESERVA TESTE",
+          raw_holder_name: nil,
+          status: "pending_review",
+          ignored: false,
+          metadata: {
+            "provider_key" => "inter_pdf",
+            "card_mask" => "4321",
+            "installment" => {
+              "detected" => true,
+              "current_number" => 8,
+              "total_installments" => 10,
+              "purchase_occurred_on" => "2025-07-02",
+              "source_format" => "parenthesized_parcela"
+            }
+          },
+          installment_detected: true,
+          installment_enabled: true,
+          installment_group_key: installment_group_key,
+          installment_number: 8,
+          installment_total: 10,
+          purchase_occurred_on: Date.new(2025, 7, 2)
+        }
+      ],
+      page_count: 1
+    }
+    parser_instance = instance_double(Parsers::Statements::InterPdfParser, call: parser_result)
 
     sign_in user
+    allow(Imports::ParserRegistry).to receive(:fetch).with("inter_pdf").and_return(Parsers::Statements::InterPdfParser)
+    allow(Parsers::Statements::InterPdfParser).to receive(:new).and_return(parser_instance)
 
     post "/api/v1/imports",
       params: {
         import: {
           credit_card_id: credit_card.id,
           provider_key: "inter_pdf",
-          source_file: Rack::Test::UploadedFile.new(Rails.root.join("doc", "inter.pdf"), "application/pdf")
+          source_file: Rack::Test::UploadedFile.new(test_pdf_fixture_path, "application/pdf")
         }
       },
       headers: csrf_headers
@@ -29,7 +114,9 @@ RSpec.describe "API imports", type: :request do
 
     import_record = Import.last
     expect(import_record).to be_review_pending
-    expect(import_record.import_items.count).to be > 10
+    expect(import_record.import_items.count).to eq(2)
+    expect(import_record.summary_payload).to include("total_items" => 2, "reviewable_items" => 1)
+    expect(import_record.raw_payload).to include("filename" => "test.pdf", "page_count" => 1)
   end
 
   it "shows, edits and confirms a reviewed import" do
