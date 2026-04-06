@@ -22,7 +22,8 @@ cd "$ROOT_DIR"
 docker compose -f "$COMPOSE_FILE" up -d db redis
 docker compose -f "$COMPOSE_FILE" run --rm web bin/rails db:prepare
 docker compose -f "$COMPOSE_FILE" run --rm web bin/rails db:seed
-docker compose -f "$COMPOSE_FILE" up -d --build web worker caddy
+docker compose -f "$COMPOSE_FILE" up -d --build web worker
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate caddy
 
 for _ in {1..30}; do
   if docker compose -f "$COMPOSE_FILE" exec -T web curl -fsS http://127.0.0.1:3000/up >/dev/null 2>&1; then

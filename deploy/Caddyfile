@@ -1,8 +1,17 @@
 {$APP_HOST} {
 	encode zstd gzip
 
-	@backend path /api/* /up /rails/*
-	reverse_proxy @backend web:3000
+	handle /api/* {
+		reverse_proxy web:3000
+	}
+
+	handle /up {
+		reverse_proxy web:3000
+	}
+
+	handle /rails/* {
+		reverse_proxy web:3000
+	}
 
 	root * /srv/frontend
 
