@@ -6,7 +6,7 @@ ENV BUNDLE_DEPLOYMENT=1 \
     RAILS_ENV=production
 
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential curl git libpq-dev pkg-config && \
+    apt-get install --no-install-recommends -y build-essential curl git libpq-dev libyaml-dev pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -27,7 +27,7 @@ ENV BUNDLE_DEPLOYMENT=1 \
     RAILS_LOG_TO_STDOUT=1
 
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libpq5 && \
+    apt-get install --no-install-recommends -y curl libpq5 libyaml-0-2 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
