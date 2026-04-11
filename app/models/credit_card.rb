@@ -7,9 +7,12 @@ class CreditCard < ApplicationRecord
   has_many :statements, dependent: :restrict_with_exception
   has_many :transactions, dependent: :restrict_with_exception
 
+  before_validation :normalize_last_four_digits
+
   validates :name, :closing_day, :due_day, presence: true
   validates :credit_limit_cents, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :closing_day, :due_day, inclusion: { in: 1..31 }
+  validates :last_four_digits, format: { with: /\A\d{4}\z/, message: "deve ter 4 dígitos" }, allow_blank: true
 
   scope :active, -> { where(active: true) }
 
@@ -58,5 +61,9 @@ class CreditCard < ApplicationRecord
   def closing_on(date)
     end_of_month = date.end_of_month.day
     Date.new(date.year, date.month, [closing_day, end_of_month].min)
+  end
+
+  def normalize_last_four_digits
+    self.last_four_digits = last_four_digits.to_s.gsub(/\D/, "").last(4).presence
   end
 end

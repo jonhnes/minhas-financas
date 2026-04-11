@@ -54,6 +54,7 @@ module Api
           :payment_account_id,
           :name,
           :brand,
+          :last_four_digits,
           :credit_limit_cents,
           :closing_day,
           :due_day,

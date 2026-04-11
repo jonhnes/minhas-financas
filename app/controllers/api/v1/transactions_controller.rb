@@ -20,15 +20,19 @@ module Api
       def create
         transaction = current_user.transactions.new
         authorize transaction
-        assign_transaction_attributes(transaction)
-        transaction.save!
+        attrs = create_transaction_params
+        assign_transaction_attributes(transaction, attrs)
+        transaction = Transactions::Create.new(
+          transaction: transaction,
+          installment: attrs[:installment]
+        ).call
 
         render_resource transaction, serializer: Api::V1::Serializers.method(:transaction), status: :created
       end
 
       def update
         authorize @transaction
-        assign_transaction_attributes(@transaction)
+        assign_transaction_attributes(@transaction, update_transaction_params)
         @transaction.save!
 
         render_resource @transaction, serializer: Api::V1::Serializers.method(:transaction)
@@ -47,7 +51,34 @@ module Api
         @transaction = policy_scope(Transaction).includes(:tags).find(params[:id])
       end
 
-      def transaction_params
+      def create_transaction_params
+        params.require(:transaction).permit(
+          :account_id,
+          :credit_card_id,
+          :card_holder_id,
+          :category_id,
+          :transfer_account_id,
+          :transaction_type,
+          :impact_mode,
+          :amount_cents,
+          :occurred_on,
+          :description,
+          :notes,
+          :canonical_merchant_name,
+          :auto_generated,
+          installment: %i[
+            enabled
+            current_number
+            total_installments
+            purchase_occurred_on
+            generate_future_installments
+          ],
+          metadata: {},
+          tag_ids: []
+        )
+      end
+
+      def update_transaction_params
         params.require(:transaction).permit(
           :account_id,
           :credit_card_id,
@@ -67,8 +98,7 @@ module Api
         )
       end
 
-      def assign_transaction_attributes(record)
-        attrs = transaction_params
+      def assign_transaction_attributes(record, attrs)
         record.assign_attributes(
           transaction_type: attrs[:transaction_type],
           impact_mode: attrs[:impact_mode],

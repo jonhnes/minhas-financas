@@ -77,6 +77,9 @@ module Imports
     end
 
     def create_regular_transaction_for(item, statement)
+      existing_transaction = regular_transaction_for(item)
+      return update_regular_transaction_from_import!(existing_transaction, item, statement: statement, import_item: item) if existing_transaction.present?
+
       import.user.transactions.create!(base_transaction_attributes(item, statement: statement, import_item: item))
     end
 
@@ -84,7 +87,7 @@ module Imports
       existing_transaction = installment_transaction_for(item.installment_group_key, item.installment_number)
 
       if existing_transaction.present?
-        unless existing_transaction.auto_generated? && existing_transaction.import_item_id.blank?
+        unless reconcilable_existing_transaction?(existing_transaction)
           raise InvalidImportError,
             "Já existe a parcela #{item.installment_number}/#{item.installment_total} para esta compra."
         end
@@ -115,7 +118,7 @@ module Imports
         existing_transaction = installment_transaction_for(item.installment_group_key, installment_number)
 
         if existing_transaction.present?
-          next unless existing_transaction.auto_generated? && existing_transaction.import_item_id.blank?
+          next unless reconcilable_existing_transaction?(existing_transaction)
 
           update_transaction_from_import!(
             existing_transaction,
@@ -181,6 +184,18 @@ module Imports
       transaction
     end
 
+    def update_regular_transaction_from_import!(transaction, item, statement:, import_item:)
+      transaction.update!(
+        base_transaction_attributes(
+          item,
+          statement: statement,
+          import_item: import_item,
+          metadata: transaction.metadata.merge(build_transaction_metadata(item, installment_number: item.installment_number, auto_generated: false))
+        )
+      )
+      transaction
+    end
+
     def base_transaction_attributes(item, statement:, import_item:, auto_generated: false, occurred_on: item.occurred_on, metadata: nil, **extra_attributes)
       {
         credit_card: import.credit_card,
@@ -233,6 +248,31 @@ module Imports
         installment_group_key: group_key,
         installment_number: installment_number
       )
+    end
+
+    def regular_transaction_for(item)
+      scope = import.user.transactions.where(
+        credit_card: import.credit_card,
+        statement_id: nil,
+        import_item_id: nil,
+        transaction_type: :expense,
+        amount_cents: item.amount_cents,
+        occurred_on: item.occurred_on,
+        installment_group_key: nil
+      )
+
+      exact_matches = scope.where(canonical_merchant_name: item.canonical_merchant_name) if item.canonical_merchant_name.present?
+      return exact_matches.sole if exact_matches&.one?
+      return nil if exact_matches.present? && exact_matches.many?
+
+      description_matches = scope.where(description: item.description)
+      return description_matches.sole if description_matches.one?
+
+      nil
+    end
+
+    def reconcilable_existing_transaction?(transaction)
+      transaction.statement_id.blank? && transaction.import_item_id.blank?
     end
   end
 end

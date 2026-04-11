@@ -119,6 +119,29 @@ RSpec.describe "API imports", type: :request do
     expect(import_record.raw_payload).to include("filename" => "test.pdf", "page_count" => 1)
   end
 
+  it "rejects PDFs larger than 50 MB" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+
+    sign_in user
+    allow_any_instance_of(ActiveStorage::Blob).to receive(:byte_size).and_return(Import::MAX_SOURCE_FILE_SIZE + 1)
+
+    expect do
+      post "/api/v1/imports",
+        params: {
+          import: {
+            credit_card_id: credit_card.id,
+            provider_key: "inter_pdf",
+            source_file: Rack::Test::UploadedFile.new(test_pdf_fixture_path, "application/pdf")
+          }
+        },
+        headers: csrf_headers
+    end.not_to change(Import, :count)
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response.parsed_body.fetch("errors")).to include(a_string_matching(/deve ter no máximo 50 MB/))
+  end
+
   it "shows, edits and confirms a reviewed import" do
     user = create(:user)
     credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)

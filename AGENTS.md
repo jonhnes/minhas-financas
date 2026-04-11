@@ -2,7 +2,8 @@
 
 ## Visao Geral
 - Este repositorio e o backend de `Minhas Financas`, uma API Rails para contas, cartoes, categorias, transacoes, orcamentos, recorrencias, faturas e importacao de extratos em PDF.
-- O projeto frontend está na pasta acima no repositorio `minhas-financas-frontend`.
+- O projeto frontend está na pasta acima no repositorio `minhas-finanças-frontend`.
+- O projeto mobile está na pasta acima no repositorio `minhas-financas-mobile`.
 - O `README.md` ainda esta generico. Use este arquivo, o codigo fonte e os arquivos em `doc/` como contexto inicial.
 - Se houver conflito entre documentacao e testes/codigo, siga o comportamento coberto pelos testes e implementado no app.
 

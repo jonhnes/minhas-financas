@@ -76,6 +76,7 @@ module Api
           payment_account_id: card.payment_account_id,
           name: card.name,
           brand: card.brand,
+          last_four_digits: card.last_four_digits,
           credit_limit_cents: card.credit_limit_cents,
           closing_day: card.closing_day,
           due_day: card.due_day,

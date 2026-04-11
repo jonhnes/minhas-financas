@@ -181,6 +181,162 @@ RSpec.describe Imports::ConfirmImport do
     expect(placeholder.metadata["provider_key"]).to eq("inter_pdf")
   end
 
+  it "reconciles a previously captured regular purchase instead of duplicating it" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    category = create(:category, user: user)
+    import_record = create(:import,
+      user: user,
+      credit_card: credit_card,
+      parsed_payload: {
+        "statement" => {
+          "period_start" => "2026-04-01",
+          "period_end" => "2026-04-30",
+          "due_date" => "2026-05-05",
+          "total_amount_cents" => 11_85,
+          "status" => "open",
+          "metadata" => {}
+        },
+        "summary" => {
+          "total_items" => 1,
+          "ignored_items" => 0,
+          "reviewable_items" => 1
+        }
+      })
+    shared_transaction = create(
+      :transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      statement: nil,
+      import_item: nil,
+      description: "UBER * PENDING",
+      canonical_merchant_name: "UBER * PENDING",
+      amount_cents: 1_185,
+      occurred_on: Date.new(2026, 4, 6),
+      metadata: {
+        "capture_source" => "clipboard",
+        "capture_provider" => "bradesco_sms"
+      }
+    )
+    tag = create(:tag, user: user, name: "SMS")
+    shared_transaction.tags << tag
+    import_item = create(
+      :import_item,
+      import: import_record,
+      category: category,
+      line_index: 1,
+      description: "UBER * PENDING",
+      canonical_merchant_name: "UBER * PENDING",
+      amount_cents: 1_185,
+      occurred_on: Date.new(2026, 4, 6),
+      metadata: { "provider_key" => "bradesco_pdf" }
+    )
+
+    statement = described_class.new(import: import_record).call
+
+    expect(statement.transactions.count).to eq(1)
+    expect(shared_transaction.reload.statement).to eq(statement)
+    expect(shared_transaction.import_item).to eq(import_item)
+    expect(shared_transaction.tags.pluck(:id)).to eq([tag.id])
+    expect(shared_transaction.metadata["capture_source"]).to eq("clipboard")
+    expect(shared_transaction.metadata["import_id"]).to eq(import_record.id)
+  end
+
+  it "reconciles the current installment previously created from a clipboard capture" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    category = create(:category, user: user)
+    import_record = create(:import,
+      user: user,
+      credit_card: credit_card,
+      parsed_payload: {
+        "statement" => {
+          "period_start" => "2026-04-01",
+          "period_end" => "2026-04-30",
+          "due_date" => "2026-05-05",
+          "total_amount_cents" => 21_480,
+          "status" => "open",
+          "metadata" => {}
+        },
+        "summary" => {
+          "total_items" => 1,
+          "ignored_items" => 0,
+          "reviewable_items" => 1
+        }
+      })
+    installment_group_key = Installments::Support.group_key(
+      credit_card_id: credit_card.id,
+      canonical_merchant_name: "IG*MYPROFIT",
+      purchase_occurred_on: Date.new(2026, 4, 6),
+      amount_cents: 21_480,
+      installment_total: 12
+    )
+    shared_transaction = create(
+      :transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      statement: nil,
+      import_item: nil,
+      description: "IG*MYPROFIT",
+      canonical_merchant_name: "IG*MYPROFIT",
+      amount_cents: 21_480,
+      occurred_on: Date.new(2026, 4, 6),
+      installment_group_key: installment_group_key,
+      installment_number: 1,
+      installment_total: 12,
+      purchase_occurred_on: Date.new(2026, 4, 6),
+      metadata: {
+        "capture_source" => "clipboard",
+        "capture_provider" => "bradesco_sms",
+        "installment" => {
+          "group_key" => installment_group_key,
+          "current_number" => 1,
+          "total_installments" => 12,
+          "purchase_occurred_on" => "2026-04-06"
+        }
+      }
+    )
+    import_item = create(
+      :import_item,
+      import: import_record,
+      category: category,
+      line_index: 1,
+      description: "IG*MYPROFIT",
+      canonical_merchant_name: "IG*MYPROFIT",
+      amount_cents: 21_480,
+      occurred_on: Date.new(2026, 4, 6),
+      installment_detected: true,
+      installment_enabled: true,
+      installment_group_key: installment_group_key,
+      installment_number: 1,
+      installment_total: 12,
+      purchase_occurred_on: Date.new(2026, 4, 6),
+      metadata: {
+        "provider_key" => "bradesco_pdf",
+        "installment" => {
+          "detected" => true,
+          "current_number" => 1,
+          "total_installments" => 12,
+          "purchase_occurred_on" => "2026-04-06",
+          "source_format" => "fractional_suffix"
+        }
+      }
+    )
+
+    statement = described_class.new(import: import_record).call
+
+    expect(statement.transactions.count).to eq(1)
+    expect(shared_transaction.reload.statement).to eq(statement)
+    expect(shared_transaction.import_item).to eq(import_item)
+    expect(shared_transaction.auto_generated).to be(false)
+    expect(shared_transaction.metadata["capture_source"]).to eq("clipboard")
+    expect(shared_transaction.metadata["import_id"]).to eq(import_record.id)
+  end
+
   it "falls back to a cleaned description for future installments when canonical merchant is missing" do
     user = create(:user)
     credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)

@@ -4,6 +4,7 @@ FactoryBot.define do
     payment_account { association :account, user: user }
     sequence(:name) { |index| "Cartão #{index}" }
     brand { "Visa" }
+    last_four_digits { nil }
     credit_limit_cents { 500_000 }
     closing_day { 5 }
     due_day { 12 }

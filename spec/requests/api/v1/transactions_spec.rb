@@ -1,15 +1,23 @@
 require "rails_helper"
 
 RSpec.describe "API transactions", type: :request do
-  it "creates a transaction and reflects it in the overview" do
-    user = create(:user)
-    account = create(:account, user: user)
-    category = create(:category, user: user)
-
+  def auth_headers_for(user)
     sign_in user
 
     get "/api/v1/auth/csrf", as: :json
     token = response.parsed_body.dig("data", "csrf_token")
+
+    {
+      "ACCEPT" => "application/json",
+      "CONTENT_TYPE" => "application/json",
+      "X-CSRF-Token" => token
+    }
+  end
+
+  it "creates a transaction and reflects it in the overview" do
+    user = create(:user)
+    account = create(:account, user: user)
+    category = create(:category, user: user)
 
     post "/api/v1/transactions",
       params: {
@@ -24,11 +32,7 @@ RSpec.describe "API transactions", type: :request do
           tag_ids: []
         }
       }.to_json,
-      headers: {
-        "ACCEPT" => "application/json",
-        "CONTENT_TYPE" => "application/json",
-        "X-CSRF-Token" => token
-      }
+      headers: auth_headers_for(user)
 
     expect(response).to have_http_status(:created)
 
@@ -36,6 +40,43 @@ RSpec.describe "API transactions", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body.dig("data", "monthly_expense_cents")).to eq(12_500)
+  end
+
+  it "creates a parcelado purchase on the card and generates the future installments" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user)
+    category = create(:category, user: user, name: "Cursos")
+
+    post "/api/v1/transactions",
+      params: {
+        transaction: {
+          credit_card_id: credit_card.id,
+          category_id: category.id,
+          transaction_type: "expense",
+          impact_mode: "normal",
+          amount_cents: 21_480,
+          occurred_on: "2026-04-06",
+          description: "IG*MYPROFIT",
+          canonical_merchant_name: "IG*MYPROFIT",
+          metadata: {
+            capture_source: "clipboard",
+            capture_provider: "bradesco_sms"
+          },
+          installment: {
+            enabled: true,
+            current_number: 1,
+            total_installments: 12,
+            purchase_occurred_on: "2026-04-06",
+            generate_future_installments: true
+          }
+        }
+      }.to_json,
+      headers: auth_headers_for(user)
+
+    expect(response).to have_http_status(:created)
+    expect(response.parsed_body.dig("data", "installment", "current_number")).to eq(1)
+    expect(user.transactions.where(installment_total: 12).count).to eq(12)
+    expect(user.transactions.where(auto_generated: true).pluck(:installment_number)).to eq((2..12).to_a)
   end
 
   it "optionally excludes third party transactions while preserving informational entries and ordering" do

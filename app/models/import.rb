@@ -1,4 +1,6 @@
 class Import < ApplicationRecord
+  MAX_SOURCE_FILE_SIZE = 50.megabytes
+
   belongs_to :user
   belongs_to :credit_card
   belongs_to :statement, optional: true
@@ -67,8 +69,8 @@ class Import < ApplicationRecord
 
   def source_file_size
     return unless source_file.attached?
-    return if source_file.blob.byte_size <= 10.megabytes
+    return if source_file.blob.byte_size <= MAX_SOURCE_FILE_SIZE
 
-    errors.add(:source_file, "deve ter no máximo 10 MB")
+    errors.add(:source_file, "deve ter no máximo 50 MB")
   end
 end
