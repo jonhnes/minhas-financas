@@ -28,6 +28,7 @@ Rails.application.routes.draw do
       resource :me, controller: :me, only: %i[show update]
       resources :accounts, except: %i[new edit]
       resources :credit_cards, except: %i[new edit] do
+        get :selectable, on: :collection
         resources :card_holders, except: %i[new edit], shallow: true
       end
       resources :categories, except: %i[new edit]

@@ -86,6 +86,14 @@ module Api
         }
       end
 
+      def selectable_credit_card(card)
+        {
+          id: card.id,
+          name: card.name,
+          brand: card.brand
+        }
+      end
+
       def card_holder(holder)
         {
           id: holder.id,
@@ -174,6 +182,7 @@ module Api
           due_date: statement.due_date,
           total_amount_cents: statement.total_amount_cents,
           status: statement.status,
+          document_kind: statement.document_kind,
           metadata: statement.metadata,
           transactions_count: statement.transactions.size
         }
@@ -198,6 +207,8 @@ module Api
           raw_holder_name: import_item.raw_holder_name,
           status: import_item.status,
           ignored: import_item.ignored,
+          comparison_status: import_item.comparison_status,
+          matched_transaction_id: import_item.matched_transaction_id,
           metadata: import_item.metadata,
           installment: installment_payload(import_item, include_flags: true)
         }
@@ -215,11 +226,13 @@ module Api
           source_kind: import_record.source_kind,
           provider_key: import_record.provider_key,
           status: import_record.status,
+          document_kind: import_record.document_kind,
           error_payload: import_record.error_payload,
           processing_started_at: import_record.processing_started_at,
           processing_finished_at: import_record.processing_finished_at,
           confirmed_at: import_record.confirmed_at,
           statement_draft: import_record.statement_payload,
+          comparison: import_record.comparison_payload.presence,
           summary: import_record.summary_payload,
           items_count: items.size,
           missing_category_count: items.count(&:needs_category?),

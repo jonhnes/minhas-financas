@@ -39,6 +39,8 @@ module Imports
             "page_count" => result[:page_count]
           }
         )
+
+        Imports::SyncBradescoReview.new(import: import).call
       end
 
       import

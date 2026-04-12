@@ -35,6 +35,14 @@ class ImportItem < ApplicationRecord
     installment_detected? && installment_enabled?
   end
 
+  def comparison_status
+    metadata["comparison_status"]
+  end
+
+  def matched_transaction_id
+    metadata["matched_transaction_id"]
+  end
+
   private
 
   def installment_fields_consistency

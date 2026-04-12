@@ -133,9 +133,19 @@ module Parsers
             Installments::Support.default_import_item_attributes
           end
 
+        final_occurred_on = structured_installment_attributes[:occurred_on] || occurred_on
+        metadata = metadata.deep_dup
+        metadata["parsed_identity"] ||= build_parsed_identity(
+          occurred_on: final_occurred_on,
+          description: description,
+          amount_cents: amount_cents,
+          canonical_merchant_name: canonical_name,
+          structured_installment_attributes: structured_installment_attributes
+        )
+
         ignored = amount_cents.negative? || description.match?(/pagamento|pag boleto/i)
         {
-          occurred_on: structured_installment_attributes[:occurred_on] || occurred_on,
+          occurred_on: final_occurred_on,
           description: description.strip,
           amount_cents: amount_cents,
           transaction_type: "expense",
@@ -180,6 +190,19 @@ module Parsers
           "purchase_occurred_on" => occurred_on.iso8601,
           "source_format" => source_format
         }
+      end
+
+      def build_parsed_identity(occurred_on:, description:, amount_cents:, canonical_merchant_name:, structured_installment_attributes:)
+        {
+          "occurred_on" => occurred_on.iso8601,
+          "description" => description.strip,
+          "amount_cents" => amount_cents,
+          "canonical_merchant_name" => canonical_merchant_name,
+          "installment_group_key" => structured_installment_attributes[:installment_group_key],
+          "installment_number" => structured_installment_attributes[:installment_number],
+          "installment_total" => structured_installment_attributes[:installment_total],
+          "purchase_occurred_on" => structured_installment_attributes[:purchase_occurred_on]&.iso8601
+        }.compact
       end
     end
   end

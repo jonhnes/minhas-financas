@@ -9,6 +9,14 @@ module Api
         render_collection scope, serializer: Api::V1::Serializers.method(:credit_card)
       end
 
+      def selectable
+        authorize CreditCard
+        scope = policy_scope(CreditCard).order(active: :desc, name: :asc)
+        render json: {
+          data: scope.map { |credit_card| Api::V1::Serializers.selectable_credit_card(credit_card) }
+        }
+      end
+
       def show
         authorize @credit_card
         render json: {

@@ -19,6 +19,10 @@ class Statement < ApplicationRecord
     "#{credit_card.name} · #{I18n.l(period_end, format: "%B/%Y")}"
   end
 
+  def document_kind
+    metadata["document_kind"]
+  end
+
   private
 
   def period_consistency

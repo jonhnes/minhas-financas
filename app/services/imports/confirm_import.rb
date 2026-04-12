@@ -10,24 +10,20 @@ module Imports
       raise InvalidImportError, "Importação não está pronta para confirmação" unless import.confirmable?
 
       statement_attributes = normalized_statement_attributes
-      if import.credit_card.statements.exists?(credit_card_id: import.credit_card_id, period_start: statement_attributes[:period_start], period_end: statement_attributes[:period_end])
+      existing_statement = existing_statement_for(statement_attributes)
+      if existing_statement.present? && !reusable_existing_open_statement?(existing_statement)
         raise InvalidImportError, "Já existe uma fatura para este cartão e período"
       end
 
       validate_items!
 
       ActiveRecord::Base.transaction do
-        statement = import.credit_card.statements.create!(
-          statement_attributes.merge(
-            metadata: statement_attributes[:metadata].merge(
-              "provider_key" => import.provider_key,
-              "import_id" => import.id
-            )
-          )
-        )
+        existing_statement&.lock!
+        statement_matches = statement_transaction_matches_for(existing_statement)
+        statement = upsert_statement!(statement_attributes, existing_statement: existing_statement)
 
         import.import_items.ordered.find_each do |item|
-          transaction = create_transaction_for(item, statement) unless item.ignored?
+          transaction = create_transaction_for(item, statement, statement_matches: statement_matches) unless item.ignored?
           item.update!(
             status: :imported,
             linked_transaction: transaction
@@ -68,7 +64,10 @@ module Imports
       end
     end
 
-    def create_transaction_for(item, statement)
+    def create_transaction_for(item, statement, statement_matches:)
+      existing_statement_transaction = statement_matches[item.id]
+      return existing_statement_transaction if existing_statement_transaction.present?
+
       return create_regular_transaction_for(item, statement) unless item.installment_active?
 
       transaction = reconcile_current_installment_transaction(item, statement)
@@ -273,6 +272,54 @@ module Imports
 
     def reconcilable_existing_transaction?(transaction)
       transaction.statement_id.blank? && transaction.import_item_id.blank?
+    end
+
+    def existing_statement_for(statement_attributes)
+      import.credit_card.statements.find_by(
+        credit_card_id: import.credit_card_id,
+        period_start: statement_attributes[:period_start],
+        period_end: statement_attributes[:period_end]
+      )
+    end
+
+    def reusable_existing_open_statement?(statement)
+      return false if statement.blank?
+
+      import.bradesco_pdf? &&
+        import.document_kind == "final_statement" &&
+        statement.document_kind == "open_statement"
+    end
+
+    def upsert_statement!(statement_attributes, existing_statement:)
+      next_metadata = statement_attributes[:metadata].merge(
+        "provider_key" => import.provider_key,
+        "import_id" => import.id
+      )
+
+      if existing_statement.present?
+        existing_statement.update!(
+          statement_attributes.merge(metadata: existing_statement.metadata.merge(next_metadata))
+        )
+        return existing_statement
+      end
+
+      import.credit_card.statements.create!(
+        statement_attributes.merge(metadata: next_metadata)
+      )
+    end
+
+    def statement_transaction_matches_for(statement)
+      return {} unless reusable_existing_open_statement?(statement)
+
+      current_items = import.import_items.reject(&:ignored?)
+      match_result = Imports::BradescoRecordMatcher.new(
+        current_records: current_items,
+        existing_records: statement.transactions.to_a
+      ).call
+
+      match_result.fetch(:matches).each_with_object({}) do |(item, transaction), memo|
+        memo[item.id] = transaction
+      end
     end
   end
 end

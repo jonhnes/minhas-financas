@@ -3,6 +3,10 @@ class CreditCardPolicy < ApplicationPolicy
     user.present?
   end
 
+  def selectable?
+    index?
+  end
+
   def show?
     owner?
   end

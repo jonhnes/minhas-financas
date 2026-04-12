@@ -52,4 +52,29 @@ RSpec.describe "API credit cards", type: :request do
     expect(response).to have_http_status(:ok)
     expect(card.reload.last_four_digits).to eq("3785")
   end
+
+  it "lists selectable credit cards without dashboard payload" do
+    user = create(:user)
+    stranger = create(:user)
+    active_card = create(:credit_card, user: user, name: "Inter Black", brand: "Mastercard", active: true)
+    inactive_card = create(:credit_card, user: user, name: "Bradesco Visa", brand: "Visa", active: false)
+    create(:credit_card, user: stranger, name: "Cartão de fora", brand: "Elo")
+
+    get "/api/v1/credit_cards/selectable", headers: auth_headers_for(user)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body).not_to have_key("meta")
+    expect(response.parsed_body.fetch("data")).to eq([
+      {
+        "id" => active_card.id,
+        "name" => "Inter Black",
+        "brand" => "Mastercard"
+      },
+      {
+        "id" => inactive_card.id,
+        "name" => "Bradesco Visa",
+        "brand" => "Visa"
+      }
+    ])
+  end
 end

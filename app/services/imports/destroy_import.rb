@@ -9,6 +9,7 @@ module Imports
     def call
       Import.transaction do
         import.lock!
+        raise DestroyError, "Não foi possível apagar a importação porque ela foi substituída por outra revisão." if import.superseded?
 
         if import.confirmed?
           destroy_confirmed_import!
@@ -24,6 +25,10 @@ module Imports
 
     def destroy_confirmed_import!
       statement = import.statement
+      if import.bradesco_pdf? && statement&.imports&.where.not(id: import.id)&.exists?
+        raise DestroyError, "Não foi possível apagar a importação porque ela participa de uma reconciliação com outra importação."
+      end
+
       linked_transactions = import.import_items.includes(:linked_transaction).filter_map(&:linked_transaction)
       generated_future_transactions = import.user.transactions.where(
         auto_generated: true,

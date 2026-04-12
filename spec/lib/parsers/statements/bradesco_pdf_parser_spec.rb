@@ -43,4 +43,35 @@ RSpec.describe Parsers::Statements::BradescoPdfParser do
     expect(non_installment_item.dig(:metadata, "installment")).to be_nil
     expect(non_installment_item[:installment_detected]).to be(false)
   end
+
+  it "extracts an open statement and tags it as open_statement" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 2, due_day: 15)
+    stub_pdf_reader_fixture("bradesco_open_statement_pages")
+
+    result = described_class.new(
+      file_path: Rails.root.join("spec", "fixtures", "files", "test.pdf"),
+      credit_card: credit_card
+    ).call
+
+    expect(result.dig(:statement, :due_date)).to eq(Date.new(2026, 4, 15))
+    expect(result.dig(:statement, :total_amount_cents)).to eq(1_793_982)
+    expect(result.dig(:statement, :metadata, "document_kind")).to eq("open_statement")
+    expect(result.dig(:summary, :total_items)).to eq(26)
+    expect(result[:items].map { |item| item[:raw_holder_name] }.uniq).to eq([
+      "JONHNES L MENEZES",
+      "FRANCISCA THAISA",
+      "MARIA V C HENRIQUE"
+    ])
+
+    expect(result[:items].none? { |item| item[:description].match?(/SALDO ANTERIOR|Total para/i) }).to be(true)
+    expect(result[:items].find { |item| item[:description] == "BABYCHICO" }).to include(
+      occurred_on: Date.new(2025, 11, 8),
+      raw_holder_name: "JONHNES L MENEZES"
+    )
+    expect(result[:items].find { |item| item[:description] == "Smiles Club Smil" }).to include(
+      occurred_on: Date.new(2026, 1, 5)
+    )
+    expect(result[:items].find { |item| item[:description] == "HOTELCOM72064052" }[:occurred_on]).to eq(Date.new(2025, 7, 4))
+  end
 end

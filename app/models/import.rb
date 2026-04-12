@@ -22,6 +22,7 @@ class Import < ApplicationRecord
     processing: "processing",
     review_pending: "review_pending",
     failed: "failed",
+    superseded: "superseded",
     confirmed: "confirmed"
   }
 
@@ -46,6 +47,14 @@ class Import < ApplicationRecord
 
   def summary_payload
     parsed_payload.fetch("summary", {})
+  end
+
+  def comparison_payload
+    parsed_payload.fetch("comparison", {})
+  end
+
+  def document_kind
+    statement_payload.dig("metadata", "document_kind")
   end
 
   def update_statement_payload!(attributes)
