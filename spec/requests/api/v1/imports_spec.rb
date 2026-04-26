@@ -353,6 +353,108 @@ RSpec.describe "API imports", type: :request do
     expect(matched_item.impact_mode).to eq("third_party")
   end
 
+  it "reuses review adjustments when a Bradesco open statement refresh replaces an open draft" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    category = create(:category, user: user)
+    holder = create(:card_holder, credit_card: credit_card, name: "Jonhnes L Menezes")
+    first_result = build_bradesco_parser_result(
+      document_kind: "open_statement",
+      items: [
+        build_bradesco_parser_item(
+          line_index: 1,
+          occurred_on: Date.new(2026, 4, 2),
+          description: "UBER * PENDING",
+          canonical_merchant_name: "UBER * PENDING",
+          amount_cents: 1_185,
+          raw_holder_name: "JONHNES L MENEZES"
+        )
+      ],
+      due_date: Date.new(2026, 4, 15)
+    )
+    refresh_result = build_bradesco_parser_result(
+      document_kind: "open_statement",
+      items: [
+        build_bradesco_parser_item(
+          line_index: 1,
+          occurred_on: Date.new(2026, 4, 2),
+          description: "UBER * PENDING",
+          canonical_merchant_name: "UBER * PENDING",
+          amount_cents: 1_185,
+          raw_holder_name: "JONHNES L MENEZES"
+        ),
+        build_bradesco_parser_item(
+          line_index: 2,
+          occurred_on: Date.new(2026, 4, 3),
+          description: "PAG*STREAMING",
+          canonical_merchant_name: "PAG*STREAMING",
+          amount_cents: 2_290,
+          raw_holder_name: "JONHNES L MENEZES"
+        )
+      ],
+      due_date: Date.new(2026, 4, 15)
+    )
+    first_parser_instance = instance_double(Parsers::Statements::BradescoPdfParser, call: first_result)
+    refresh_parser_instance = instance_double(Parsers::Statements::BradescoPdfParser, call: refresh_result)
+
+    sign_in user
+    headers = csrf_headers
+
+    allow(Imports::ParserRegistry).to receive(:fetch).with("bradesco_pdf").and_return(Parsers::Statements::BradescoPdfParser)
+    allow(Parsers::Statements::BradescoPdfParser).to receive(:new).and_return(first_parser_instance, refresh_parser_instance)
+
+    post "/api/v1/imports",
+      params: {
+        import: {
+          credit_card_id: credit_card.id,
+          provider_key: "bradesco_pdf",
+          source_file: Rack::Test::UploadedFile.new(test_pdf_fixture_path, "application/pdf")
+        }
+      },
+      headers: headers
+
+    first_import = Import.last
+    first_item = first_import.import_items.sole
+    first_item.update!(
+      occurred_on: Date.new(2026, 4, 8),
+      description: "UBER * CORRIGIDO",
+      amount_cents: 1_300,
+      category: category,
+      card_holder: holder,
+      impact_mode: :third_party
+    )
+
+    post "/api/v1/imports",
+      params: {
+        import: {
+          credit_card_id: credit_card.id,
+          provider_key: "bradesco_pdf",
+          source_file: Rack::Test::UploadedFile.new(test_pdf_fixture_path, "application/pdf")
+        }
+      },
+      headers: headers
+
+    expect(response).to have_http_status(:created)
+    expect(response.parsed_body.dig("data", "document_kind")).to eq("open_statement")
+    expect(response.parsed_body.dig("data", "comparison", "mode")).to eq("refreshing_open_draft")
+
+    refresh_import = Import.order(:id).last
+    expect(first_import.reload).to be_superseded
+    expect(refresh_import.comparison_payload).to include(
+      "mode" => "refreshing_open_draft",
+      "matched_existing_count" => 1,
+      "new_items_count" => 1
+    )
+
+    matched_item = refresh_import.reload.import_items.order(:line_index).first
+    expect(matched_item.occurred_on).to eq(Date.new(2026, 4, 8))
+    expect(matched_item.description).to eq("UBER * CORRIGIDO")
+    expect(matched_item.amount_cents).to eq(1_300)
+    expect(matched_item.category_id).to eq(category.id)
+    expect(matched_item.card_holder_id).to eq(holder.id)
+    expect(matched_item.impact_mode).to eq("third_party")
+  end
+
   it "shows a comparison against an existing open Bradesco statement before confirmation" do
     user = create(:user)
     credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
@@ -444,6 +546,95 @@ RSpec.describe "API imports", type: :request do
     expect(new_item).to include(
       "comparison_status" => "new_item",
       "matched_transaction_id" => nil
+    )
+  end
+
+  it "shows a comparison when refreshing an existing open Bradesco statement" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 5)
+    category = create(:category, user: user)
+    statement = create(:statement,
+      credit_card: credit_card,
+      period_start: Date.new(2026, 3, 1),
+      period_end: Date.new(2026, 3, 31),
+      due_date: Date.new(2026, 4, 15),
+      total_amount_cents: 3_475,
+      metadata: {
+        "provider_key" => "bradesco_pdf",
+        "document_kind" => "open_statement"
+      })
+    matched_transaction = create(:transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      statement: statement,
+      description: "UBER * PENDING",
+      canonical_merchant_name: "UBER * PENDING",
+      amount_cents: 1_185,
+      occurred_on: Date.new(2026, 4, 2))
+    missing_transaction = create(:transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: category,
+      statement: statement,
+      description: "ANTIGO ITEM",
+      canonical_merchant_name: "ANTIGO ITEM",
+      amount_cents: 9_999,
+      occurred_on: Date.new(2026, 4, 1))
+    parser_result = build_bradesco_parser_result(
+      document_kind: "open_statement",
+      items: [
+        build_bradesco_parser_item(
+          line_index: 1,
+          occurred_on: Date.new(2026, 4, 2),
+          description: "UBER * PENDING",
+          canonical_merchant_name: "UBER * PENDING",
+          amount_cents: 1_185,
+          raw_holder_name: "JONHNES L MENEZES"
+        )
+      ],
+      due_date: Date.new(2026, 4, 15),
+      total_amount_cents: 1_185
+    )
+    parser_instance = instance_double(Parsers::Statements::BradescoPdfParser, call: parser_result)
+
+    sign_in user
+    headers = csrf_headers
+
+    allow(Imports::ParserRegistry).to receive(:fetch).with("bradesco_pdf").and_return(Parsers::Statements::BradescoPdfParser)
+    allow(Parsers::Statements::BradescoPdfParser).to receive(:new).and_return(parser_instance)
+
+    post "/api/v1/imports",
+      params: {
+        import: {
+          credit_card_id: credit_card.id,
+          provider_key: "bradesco_pdf",
+          source_file: Rack::Test::UploadedFile.new(test_pdf_fixture_path, "application/pdf")
+        }
+      },
+      headers: headers
+
+    expect(response).to have_http_status(:created)
+    expect(response.parsed_body.dig("data", "comparison")).to include(
+      "mode" => "refreshing_existing_open_statement",
+      "existing_statement_id" => statement.id,
+      "matched_existing_count" => 1,
+      "new_items_count" => 0,
+      "missing_from_final_count" => 1
+    )
+    expect(response.parsed_body.dig("data", "comparison", "missing_from_final_transactions").sole).to include(
+      "transaction_id" => missing_transaction.id,
+      "description" => "ANTIGO ITEM"
+    )
+    expect(response.parsed_body.dig("data", "can_confirm")).to be(true)
+
+    matched_item = Import.last.import_items.sole
+    expect(matched_item.category_id).to eq(category.id)
+    expect(matched_item.metadata).to include(
+      "comparison_status" => "matched_existing_statement_transaction",
+      "matched_transaction_id" => matched_transaction.id
     )
   end
 

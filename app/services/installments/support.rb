@@ -2,7 +2,7 @@ require "digest"
 
 module Installments
   module Support
-    BRADESCO_INSTALLMENT_MARKER_PATTERN = /\b\d{2}\/\d{2}\b/.freeze
+    BRADESCO_INSTALLMENT_MARKER_PATTERN = /(?:\s*\(\s*\d{2}\/\d{2}\s*\)|\b\d{2}\/\d{2}\b)/.freeze
     INTER_INSTALLMENT_MARKER_PATTERN = /\(PARCELA\s+\d{2}\s+DE\s+\d{2}\)\z/i.freeze
 
     module_function

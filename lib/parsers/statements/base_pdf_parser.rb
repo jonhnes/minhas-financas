@@ -3,7 +3,7 @@ module Parsers
     class UnsupportedDocumentError < StandardError; end
 
     class BasePdfParser
-      BRADESCO_INSTALLMENT_PATTERN = /\b(?<current>\d{2})\/(?<total>\d{2})\z/.freeze
+      BRADESCO_INSTALLMENT_PATTERN = /(?:\(\s*)?(?<current>\d{2})\/(?<total>\d{2})(?:\s*\))?\z/.freeze
       INTER_INSTALLMENT_PATTERN = /\(PARCELA\s+(?<current>\d{2})\s+DE\s+(?<total>\d{2})\)\z/i.freeze
 
       PT_BR_MONTHS = {

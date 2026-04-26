@@ -5,6 +5,7 @@ module Imports
       unattached: "matched_unattached_transaction",
       new_item: "new_item"
     }.freeze
+    REFRESHABLE_DOCUMENT_KINDS = %w[open_statement final_statement].freeze
 
     def initialize(import:)
       @import = import
@@ -31,7 +32,7 @@ module Imports
     attr_reader :import
 
     def replace_open_draft_if_needed!
-      return nil unless import.document_kind == "final_statement"
+      return nil unless REFRESHABLE_DOCUMENT_KINDS.include?(import.document_kind)
 
       open_drafts = same_period_imports.select do |candidate|
         candidate.review_pending? && candidate.document_kind == "open_statement"
@@ -51,6 +52,7 @@ module Imports
       open_drafts.each { |draft| draft.update!(status: :superseded) }
 
       {
+        mode: import.document_kind == "final_statement" ? "replacing_open_draft" : "refreshing_open_draft",
         source_import_id: source_import.id,
         matched_existing_count: match_result.fetch(:matches).size,
         new_items_count: import.import_items.size - match_result.fetch(:matches).size
@@ -58,7 +60,7 @@ module Imports
     end
 
     def sync_existing_statement_comparison_if_needed!
-      return nil unless import.document_kind == "final_statement"
+      return nil unless REFRESHABLE_DOCUMENT_KINDS.include?(import.document_kind)
 
       statement = matching_statement
       return nil unless statement&.document_kind == "open_statement"
@@ -76,7 +78,7 @@ module Imports
       unmatched_transactions = match_result.fetch(:unmatched_existing)
 
       {
-        mode: "finalizing_existing_open_statement",
+        mode: import.document_kind == "final_statement" ? "finalizing_existing_open_statement" : "refreshing_existing_open_statement",
         existing_statement_id: statement.id,
         matched_existing_count: match_result.fetch(:matches).size,
         new_items_count: current_items.size - match_result.fetch(:matches).size,
@@ -115,7 +117,7 @@ module Imports
           statement_match_payload
         elsif replaced_open_draft.present?
           {
-            mode: "replacing_open_draft",
+            mode: replaced_open_draft.fetch(:mode),
             existing_statement_id: nil,
             matched_existing_count: replaced_open_draft.fetch(:matched_existing_count),
             new_items_count: replaced_open_draft.fetch(:new_items_count),
@@ -136,11 +138,25 @@ module Imports
 
     def mark_preview_match!(item:, status:, transaction:)
       item.update!(
-        metadata: item.metadata.merge(
-          "comparison_status" => status,
-          "matched_transaction_id" => transaction.id
+        transaction_review_attributes(transaction).merge(
+          metadata: item.metadata.merge(
+            "comparison_status" => status,
+            "matched_transaction_id" => transaction.id
+          )
         )
       )
+    end
+
+    def transaction_review_attributes(transaction)
+      {
+        occurred_on: transaction.occurred_on,
+        description: transaction.description,
+        amount_cents: transaction.amount_cents,
+        card_holder: transaction.card_holder,
+        category: transaction.category,
+        impact_mode: transaction.impact_mode,
+        canonical_merchant_name: transaction.canonical_merchant_name
+      }
     end
 
     def reset_preview_matches!

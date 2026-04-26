@@ -1,0 +1,38 @@
+pages:
+  - |
+    Fatura                                               Data 26/04/2026 - 06:24:47
+    Cartao selecionado
+    Data de vencimento: 15/05/2026
+    Total da fatura: R$ 10.487,06
+    Data     Lancamentos                                                            Moeda de Origem         Valor (US$)      Cotacao (US$)       Valor (R$)
+
+         Gastos referentes ao cartao: Final 3468 | JONHNES L MENEZES                                                          Valor da fatura: R$ 5.876,30
+
+       23
+                         ITALO SUPERMERCADOS                                                                                                  59,77
+      ABR
+
+                         5 creditos 225QV1                                                                                                     5,00
+
+      20                 RENTCARS ( 01/03 )                                                                                                  218,79
+      ABR
+
+      19
+                         SHOPEE *ATACADOINOVA                                                                                               -10,00
+      ABR
+
+      15
+                         SALDO ANTERIOR                                                                                                   14.030,90
+      ABR
+  - |
+    Gastos referentes ao cartao: Final 3785 | FRANCISCA THAISA                                                                  Valor da fatura: R$ 622,70
+
+      16
+      DEZ                HOTEIS.COM ( 05/10 )                                                                                                 58,06
+
+    Total da fatura (final 3468 + 3785): R$ 10.487,06
+    *Extrato em Aberto: Valores sujeitos a alteracao ate o fechamento da fatura.
+
+    Data Lancamentos programados                                                     Moeda de Origem        Valor (US$)      Cotacao (US$)      Valor (R$)
+      25                PET LOVE*Order 10 SA ( 03/03 )                                                                                       125,79
+    Total dos lancamentos programados* R$ 125,79

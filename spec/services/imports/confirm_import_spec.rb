@@ -585,6 +585,116 @@ RSpec.describe Imports::ConfirmImport do
     expect(new_item.linked_transaction.statement).to eq(statement)
   end
 
+  it "reuses an existing open Bradesco statement when a refreshed open statement is confirmed" do
+    user = create(:user)
+    credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 15)
+    original_category = create(:category, user: user, name: "Categoria original")
+    refresh_category = create(:category, user: user, name: "Categoria refresh")
+    statement = create(:statement,
+      credit_card: credit_card,
+      period_start: Date.new(2026, 3, 1),
+      period_end: Date.new(2026, 3, 31),
+      due_date: Date.new(2026, 4, 15),
+      total_amount_cents: 1_185,
+      metadata: {
+        "provider_key" => "bradesco_pdf",
+        "document_kind" => "open_statement",
+        "import_id" => 999
+      })
+    open_import = create(:import,
+      user: user,
+      credit_card: credit_card,
+      statement: statement,
+      provider_key: :bradesco_pdf,
+      status: :confirmed,
+      confirmed_at: Time.zone.parse("2026-04-02 11:00:00"))
+    open_import_item = create(:import_item,
+      import: open_import,
+      category: original_category,
+      status: :imported,
+      occurred_on: Date.new(2026, 4, 2),
+      description: "UBER * PENDING",
+      canonical_merchant_name: "UBER * PENDING",
+      amount_cents: 1_185,
+      metadata: { "provider_key" => "bradesco_pdf" })
+    existing_transaction = create(:transaction,
+      :credit_card_purchase,
+      user: user,
+      credit_card: credit_card,
+      category: original_category,
+      statement: statement,
+      import_item: open_import_item,
+      description: "UBER * PENDING",
+      canonical_merchant_name: "UBER * PENDING",
+      amount_cents: 1_185,
+      occurred_on: Date.new(2026, 4, 2),
+      notes: "manter observação",
+      metadata: { "provider_key" => "bradesco_pdf", "import_id" => open_import.id })
+    open_import_item.update!(linked_transaction: existing_transaction)
+
+    refresh_import = create(:import,
+      user: user,
+      credit_card: credit_card,
+      provider_key: :bradesco_pdf,
+      parsed_payload: {
+        "statement" => {
+          "period_start" => "2026-03-01",
+          "period_end" => "2026-03-31",
+          "due_date" => "2026-04-15",
+          "total_amount_cents" => 3_475,
+          "status" => "open",
+          "metadata" => {
+            "provider_key" => "bradesco_pdf",
+            "document_kind" => "open_statement"
+          }
+        },
+        "summary" => {
+          "total_items" => 2,
+          "ignored_items" => 0,
+          "reviewable_items" => 2
+        }
+      })
+    matched_item = create(:import_item,
+      import: refresh_import,
+      category: nil,
+      line_index: 1,
+      occurred_on: Date.new(2026, 4, 2),
+      description: "UBER * PENDING",
+      canonical_merchant_name: "UBER * PENDING",
+      amount_cents: 1_185,
+      metadata: { "provider_key" => "bradesco_pdf" })
+    new_item = create(:import_item,
+      import: refresh_import,
+      category: refresh_category,
+      line_index: 2,
+      occurred_on: Date.new(2026, 4, 3),
+      description: "PAG*STREAMING",
+      canonical_merchant_name: "PAG*STREAMING",
+      amount_cents: 2_290,
+      metadata: { "provider_key" => "bradesco_pdf" })
+
+    Imports::SyncBradescoReview.new(import: refresh_import).call
+    confirmed_statement = described_class.new(import: refresh_import).call
+
+    expect(confirmed_statement.id).to eq(statement.id)
+    expect(confirmed_statement.reload.document_kind).to eq("open_statement")
+    expect(confirmed_statement.total_amount_cents).to eq(3_475)
+    expect(confirmed_statement.metadata["import_id"]).to eq(refresh_import.id)
+    expect(refresh_import.reload.statement).to eq(statement)
+    expect(refresh_import).to be_confirmed
+
+    expect(statement.transactions.where(description: "UBER * PENDING").count).to eq(1)
+    expect(existing_transaction.reload.category).to eq(original_category)
+    expect(existing_transaction.notes).to eq("manter observação")
+    expect(existing_transaction.import_item).to eq(open_import_item)
+    expect(matched_item.reload.category).to eq(original_category)
+    expect(matched_item.linked_transaction).to eq(existing_transaction)
+
+    expect(statement.transactions.where(description: "PAG*STREAMING").count).to eq(1)
+    expect(new_item.reload.linked_transaction).to be_present
+    expect(new_item.linked_transaction.statement).to eq(statement)
+  end
+
   it "still rejects a final Bradesco statement when the same period is already finalized" do
     user = create(:user)
     credit_card = create(:credit_card, user: user, closing_day: 28, due_day: 15)

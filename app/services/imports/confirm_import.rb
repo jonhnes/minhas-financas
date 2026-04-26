@@ -11,7 +11,7 @@ module Imports
 
       statement_attributes = normalized_statement_attributes
       existing_statement = existing_statement_for(statement_attributes)
-      if existing_statement.present? && !reusable_existing_open_statement?(existing_statement)
+      if existing_statement.present? && !reusable_existing_statement?(existing_statement)
         raise InvalidImportError, "Já existe uma fatura para este cartão e período"
       end
 
@@ -282,11 +282,11 @@ module Imports
       )
     end
 
-    def reusable_existing_open_statement?(statement)
+    def reusable_existing_statement?(statement)
       return false if statement.blank?
 
       import.bradesco_pdf? &&
-        import.document_kind == "final_statement" &&
+        %w[open_statement final_statement].include?(import.document_kind) &&
         statement.document_kind == "open_statement"
     end
 
@@ -309,7 +309,7 @@ module Imports
     end
 
     def statement_transaction_matches_for(statement)
-      return {} unless reusable_existing_open_statement?(statement)
+      return {} unless reusable_existing_statement?(statement)
 
       current_items = import.import_items.reject(&:ignored?)
       match_result = Imports::BradescoRecordMatcher.new(
