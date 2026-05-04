@@ -1,8 +1,11 @@
+require "tempfile"
+
 module Parsers
   module Statements
     class UnsupportedDocumentError < StandardError; end
 
     class BasePdfParser
+      PDF_HEADER = "%PDF-".b.freeze
       BRADESCO_INSTALLMENT_PATTERN = /(?:\(\s*)?(?<current>\d{2})\/(?<total>\d{2})(?:\s*\))?\z/.freeze
       INTER_INSTALLMENT_PATTERN = /\(PARCELA\s+(?<current>\d{2})\s+DE\s+(?<total>\d{2})\)\z/i.freeze
 
@@ -61,7 +64,26 @@ module Parsers
       attr_reader :credit_card, :file_path
 
       def reader
-        @reader ||= PDF::Reader.new(file_path)
+        @reader ||= PDF::Reader.new(normalized_pdf_path)
+      end
+
+      def normalized_pdf_path
+        @normalized_pdf_path ||= begin
+          content = File.binread(file_path)
+          header_index = content.index(PDF_HEADER)
+          raise UnsupportedDocumentError, "Arquivo PDF inválido" unless header_index
+
+          if header_index.zero?
+            file_path
+          else
+            Tempfile.new(["statement-import", ".pdf"]).tap do |file|
+              file.binmode
+              file.write(content.byteslice(header_index..))
+              file.flush
+              @normalized_pdf_tempfile = file
+            end.path
+          end
+        end
       end
 
       def provider_metadata
