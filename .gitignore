@@ -59,6 +59,10 @@ config/secrets.yml
 /public/uploads
 
 /.idea/*
+/.claude/*
+/.codex/*
+/openspec/*
 
 /doc/*
 !/doc/hetzner_deploy.md
+!/doc/minhas_financas_mcp.md
