@@ -44,6 +44,11 @@ Rails.application.routes.draw do
       resources :budgets, except: %i[new edit]
       resources :recurring_rules, except: %i[new edit]
 
+      namespace :mcp do
+        post "browser_auth/authorizations", to: "browser_auth#create"
+        post "browser_auth/token", to: "browser_auth#token"
+      end
+
       namespace :reports do
         get :overview
         get :monthly_flow

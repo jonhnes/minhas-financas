@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_06_103000) do
+ActiveRecord::Schema[8.0].define(version: 2026_06_23_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -193,6 +193,21 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_06_103000) do
     t.index ["user_id"], name: "index_imports_on_user_id"
   end
 
+  create_table "mcp_browser_auth_grants", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "code_digest", null: false
+    t.string "callback_url", null: false
+    t.string "device_label"
+    t.datetime "expires_at", null: false
+    t.datetime "used_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code_digest"], name: "index_mcp_browser_auth_grants_on_code_digest", unique: true
+    t.index ["expires_at"], name: "index_mcp_browser_auth_grants_on_expires_at"
+    t.index ["used_at"], name: "index_mcp_browser_auth_grants_on_used_at"
+    t.index ["user_id"], name: "index_mcp_browser_auth_grants_on_user_id"
+  end
+
   create_table "mobile_sessions", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "access_token_digest", null: false
@@ -353,6 +368,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_06_103000) do
   add_foreign_key "imports", "credit_cards"
   add_foreign_key "imports", "statements"
   add_foreign_key "imports", "users"
+  add_foreign_key "mcp_browser_auth_grants", "users"
   add_foreign_key "mobile_sessions", "users"
   add_foreign_key "recurring_rules", "accounts"
   add_foreign_key "recurring_rules", "card_holders"
