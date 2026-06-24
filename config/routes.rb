@@ -48,6 +48,7 @@ Rails.application.routes.draw do
         post "browser_auth/authorizations", to: "browser_auth#create"
         post "browser_auth/token", to: "browser_auth#token"
       end
+      post "financial_resets/transactions", to: "financial_resets#create"
 
       namespace :reports do
         get :overview
