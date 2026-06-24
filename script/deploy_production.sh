@@ -20,9 +20,18 @@ set +a
 cd "$ROOT_DIR"
 
 docker compose -f "$COMPOSE_FILE" up -d db redis
+docker compose -f "$COMPOSE_FILE" build web worker
 docker compose -f "$COMPOSE_FILE" run --rm web bin/rails db:prepare
+MIGRATION_STATUS="$(docker compose -f "$COMPOSE_FILE" run --rm web bin/rails db:migrate:status)"
+printf '%s\n' "$MIGRATION_STATUS"
+
+if grep -qE '^[[:space:]]*down[[:space:]]' <<<"$MIGRATION_STATUS"; then
+  echo "Pending migrations remain after db:prepare" >&2
+  exit 1
+fi
+
 docker compose -f "$COMPOSE_FILE" run --rm web bin/rails db:seed
-docker compose -f "$COMPOSE_FILE" up -d --build web worker
+docker compose -f "$COMPOSE_FILE" up -d web worker
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate caddy
 
 for _ in {1..30}; do
