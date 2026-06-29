@@ -80,8 +80,16 @@ RSpec.describe "API MCP browser auth", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body.dig("data", "access_token")).to be_present
     expect(response.parsed_body.dig("data", "refresh_token")).to be_present
+    expect(Time.zone.parse(response.parsed_body.dig("data", "expires_at"))).to be_between(
+      MobileSession::MCP_ACCESS_TOKEN_TTL.from_now - 5.seconds,
+      MobileSession::MCP_ACCESS_TOKEN_TTL.from_now + 5.seconds
+    )
     expect(response.parsed_body.dig("data", "user", "email")).to eq(user.email)
     expect(MobileSession.last.platform).to eq("mcp")
+    expect(MobileSession.last.expires_at).to be_between(
+      MobileSession::MCP_ACCESS_TOKEN_TTL.from_now - 5.seconds,
+      MobileSession::MCP_ACCESS_TOKEN_TTL.from_now + 5.seconds
+    )
 
     post "/api/v1/mcp/browser_auth/token",
       params: {

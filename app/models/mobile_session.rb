@@ -1,7 +1,9 @@
 class MobileSession < ApplicationRecord
   ACCESS_TOKEN_TTL = 15.minutes
+  MCP_ACCESS_TOKEN_TTL = 24.hours
   REFRESH_TOKEN_TTL = 30.days
   LAST_USED_AT_WRITE_INTERVAL = 5.minutes
+  MCP_PLATFORM = "mcp"
 
   belongs_to :user
 
@@ -18,7 +20,7 @@ class MobileSession < ApplicationRecord
       device_label: device_label.presence,
       access_token_digest: digest_token(access_token),
       refresh_token_digest: digest_token(refresh_token),
-      expires_at: ACCESS_TOKEN_TTL.from_now,
+      expires_at: access_token_ttl_for(platform).from_now,
       refresh_expires_at: REFRESH_TOKEN_TTL.from_now,
       last_used_at: Time.current
     )
@@ -57,6 +59,10 @@ class MobileSession < ApplicationRecord
     SecureRandom.urlsafe_base64(48)
   end
 
+  def self.access_token_ttl_for(platform)
+    platform.to_s == MCP_PLATFORM ? MCP_ACCESS_TOKEN_TTL : ACCESS_TOKEN_TTL
+  end
+
   def access_token_active?
     revoked_at.blank? && expires_at.future? && refresh_expires_at.future?
   end
@@ -72,7 +78,7 @@ class MobileSession < ApplicationRecord
     update!(
       access_token_digest: self.class.digest_token(access_token),
       refresh_token_digest: self.class.digest_token(refresh_token),
-      expires_at: self.class::ACCESS_TOKEN_TTL.from_now,
+      expires_at: self.class.access_token_ttl_for(platform).from_now,
       refresh_expires_at: self.class::REFRESH_TOKEN_TTL.from_now,
       last_used_at: Time.current
     )
