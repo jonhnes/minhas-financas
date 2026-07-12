@@ -15,6 +15,9 @@ services:
       - ../frontend-dist:/srv/frontend:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      default:
+      edge:
 
   web:
     build:
@@ -84,3 +87,8 @@ volumes:
   postgres_data:
   rails_storage:
   redis_data:
+
+networks:
+  edge:
+    external: true
+    name: edge

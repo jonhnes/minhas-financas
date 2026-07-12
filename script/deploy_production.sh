@@ -19,6 +19,10 @@ set +a
 
 cd "$ROOT_DIR"
 
+if ! docker network inspect edge >/dev/null 2>&1; then
+  docker network create edge
+fi
+
 docker compose -f "$COMPOSE_FILE" up -d db redis
 docker compose -f "$COMPOSE_FILE" build web worker
 docker compose -f "$COMPOSE_FILE" run --rm web bin/rails db:prepare

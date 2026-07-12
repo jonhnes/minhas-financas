@@ -24,3 +24,8 @@
 		}
 	}
 }
+
+ponto.jonhnes.com.br {
+	encode zstd gzip
+	reverse_proxy ponto-web:8000
+}
