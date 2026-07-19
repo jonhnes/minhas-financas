@@ -54,6 +54,7 @@ Rails.application.routes.draw do
         get :overview
         get :monthly_flow
         get :category_breakdown
+        get :spending_distribution
         get :budget_status
         get :merchant_ranking
       end

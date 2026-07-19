@@ -16,6 +16,17 @@ module Api
         render json: { data: Reports::CategoryBreakdownQuery.new(user: current_user, params: params).call }
       end
 
+      def spending_distribution
+        authorize Transaction, :index?
+        render json: {
+          data: Reports::SpendingDistributionQuery.new(
+            user: current_user,
+            params: params,
+            categories_scope: policy_scope(Category)
+          ).call
+        }
+      end
+
       def budget_status
         authorize Budget, :index?
         render json: {

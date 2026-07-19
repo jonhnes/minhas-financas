@@ -247,4 +247,33 @@ RSpec.describe "API transactions", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([lowest.id, middle.id, highest.id])
   end
+
+  it "filters exact, descendant and uncategorized category scopes without exposing other users' categories" do
+    user = create(:user)
+    other_user = create(:user)
+    account = create(:account, user: user)
+    root = create(:category, user: user, name: "Casa")
+    child = create(:category, user: user, parent: root, name: "Mercado")
+    grandchild = create(:category, user: user, parent: child, name: "Feira")
+    other_category = create(:category, user: other_user, name: "Privada")
+    root_transaction = create(:transaction, user: user, account: account, category: root, occurred_on: Date.new(2026, 7, 1))
+    child_transaction = create(:transaction, user: user, account: account, category: child, occurred_on: Date.new(2026, 7, 2))
+    grandchild_transaction = create(:transaction, user: user, account: account, category: grandchild, occurred_on: Date.new(2026, 7, 3))
+    uncategorized_transaction = create(:transaction, user: user, account: account, category: root, occurred_on: Date.new(2026, 7, 4))
+    uncategorized_transaction.update_column(:category_id, nil)
+
+    sign_in user
+
+    get "/api/v1/transactions", params: { category_id: root.id }, as: :json
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([root_transaction.id])
+
+    get "/api/v1/transactions", params: { category_id: root.id, include_descendants: true }, as: :json
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to contain_exactly(root_transaction.id, child_transaction.id, grandchild_transaction.id)
+
+    get "/api/v1/transactions", params: { category_missing: true }, as: :json
+    expect(response.parsed_body.fetch("data").map { |row| row.fetch("id") }).to eq([uncategorized_transaction.id])
+
+    get "/api/v1/transactions", params: { category_id: other_category.id }, as: :json
+    expect(response).to have_http_status(:not_found)
+  end
 end

@@ -7,14 +7,21 @@ module Reports
       @use_month = use_month
     end
 
-    def call(exclude_third_party: false, exclude_informational: false, exclude_transfers: false)
+    def call(
+      exclude_third_party: false,
+      exclude_informational: false,
+      exclude_transfers: false,
+      apply_category_filter: true,
+      apply_date_filter: true,
+      impact_modes: nil
+    )
       scoped = scope
       scoped = scoped.where(account_id: params[:account_id]) if params[:account_id].present?
       scoped = scoped.where(credit_card_id: params[:credit_card_id]) if params[:credit_card_id].present?
       scoped = scoped.where(card_holder_id: params[:card_holder_id]) if params[:card_holder_id].present?
-      scoped = scoped.where(category_id: params[:category_id]) if params[:category_id].present?
-      scoped = scoped.where("occurred_on >= ?", effective_occurred_from) if effective_occurred_from.present?
-      scoped = scoped.where("occurred_on <= ?", effective_occurred_to) if effective_occurred_to.present?
+      scoped = scoped.where(category_id: params[:category_id]) if apply_category_filter && params[:category_id].present?
+      scoped = scoped.where("occurred_on >= ?", effective_occurred_from) if apply_date_filter && effective_occurred_from.present?
+      scoped = scoped.where("occurred_on <= ?", effective_occurred_to) if apply_date_filter && effective_occurred_to.present?
       scoped = scoped.joins(:transaction_tags).where(transaction_tags: { tag_id: params[:tag_id] }) if params[:tag_id].present?
 
       if params[:query].present?
@@ -22,6 +29,7 @@ module Reports
         scoped = scoped.where("description ILIKE :query OR canonical_merchant_name ILIKE :query", query: query)
       end
 
+      scoped = scoped.where(impact_mode: impact_modes) if impact_modes.present?
       scoped = scoped.where.not(impact_mode: "third_party") if exclude_third_party
       scoped = scoped.where.not(impact_mode: "informational") if exclude_informational
       scoped = scoped.where.not(transaction_type: "transfer") if exclude_transfers

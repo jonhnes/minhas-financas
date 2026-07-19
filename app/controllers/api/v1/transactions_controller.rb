@@ -121,7 +121,7 @@ module Api
         scope = scope.where(account_id: params[:account_id]) if params[:account_id].present?
         scope = scope.where(credit_card_id: params[:credit_card_id]) if params[:credit_card_id].present?
         scope = scope.where(card_holder_id: params[:card_holder_id]) if params[:card_holder_id].present?
-        scope = scope.where(category_id: params[:category_id]) if params[:category_id].present?
+        scope = filter_category_scope(scope)
         scope = scope.where(statement_id: params[:statement_id]) if params[:statement_id].present?
         scope = scope.where(impact_mode: params[:impact_mode]) if params[:impact_mode].present?
         scope = scope.where.not(impact_mode: "third_party") if exclude_third_party?
@@ -134,6 +134,38 @@ module Api
 
         query = "%#{params[:query].strip}%"
         scope.where("description ILIKE :query OR canonical_merchant_name ILIKE :query", query: query)
+      end
+
+      def filter_category_scope(scope)
+        return scope.where(category_id: nil) if category_missing?
+        return scope if params[:category_id].blank?
+
+        category = lookup_category(params[:category_id])
+        category_ids = include_descendants? ? category_and_descendant_ids(category) : [ category.id ]
+        scope.where(category_id: category_ids)
+      end
+
+      def category_and_descendant_ids(category)
+        children_by_parent_id = policy_scope(Category).pluck(:id, :parent_id).group_by(&:last)
+        category_ids = []
+        pending_ids = [ category.id ]
+
+        while (category_id = pending_ids.shift)
+          next if category_ids.include?(category_id)
+
+          category_ids << category_id
+          pending_ids.concat(children_by_parent_id.fetch(category_id, []).map(&:first))
+        end
+
+        category_ids
+      end
+
+      def include_descendants?
+        ActiveModel::Type::Boolean.new.cast(params[:include_descendants])
+      end
+
+      def category_missing?
+        ActiveModel::Type::Boolean.new.cast(params[:category_missing])
       end
 
       def sort_scope(scope)

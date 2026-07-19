@@ -152,4 +152,40 @@ RSpec.describe "API reports", type: :request do
       ]
     )
   end
+
+  it "returns a tenant-scoped spending distribution with stable category identifiers" do
+    user = create(:user)
+    other_user = create(:user)
+    account = create(:account, user: user)
+    other_account = create(:account, user: other_user)
+    first_category = create(:category, user: user, name: "Duplicada")
+    second_category = create(:category, user: user, name: "Duplicada")
+    other_category = create(:category, user: other_user, name: "Duplicada")
+
+    create(:transaction, user: user, account: account, category: first_category, amount_cents: 15_000, occurred_on: Date.new(2026, 7, 3))
+    create(:transaction, user: user, account: account, category: second_category, amount_cents: 9_000, occurred_on: Date.new(2026, 7, 4))
+    create(:transaction, user: other_user, account: other_account, category: other_category, amount_cents: 99_000, occurred_on: Date.new(2026, 7, 5))
+
+    sign_in user
+
+    allow(Time.zone).to receive(:today).and_return(Date.new(2026, 8, 1))
+
+    get "/api/v1/reports/spending_distribution", params: { month: "2026-07" }, as: :json
+
+    expect(response).to have_http_status(:ok)
+    data = response.parsed_body.fetch("data")
+    expect(data).to include(
+      "total_amount_cents" => 24_000,
+      "transactions_count" => 2,
+      "period" => { "from" => "2026-07-01", "to" => "2026-07-31", "partial" => false }
+    )
+    expect(data.fetch("categories").map { |entry| entry.fetch("category_id") }).to contain_exactly(first_category.id, second_category.id)
+    expect(data.fetch("categories").map { |entry| entry.fetch("key") }).to contain_exactly("category:#{first_category.id}", "category:#{second_category.id}")
+  end
+
+  it "requires authentication for spending distribution" do
+    get "/api/v1/reports/spending_distribution", params: { month: "2026-07" }, as: :json
+
+    expect(response).to have_http_status(:unauthorized)
+  end
 end
