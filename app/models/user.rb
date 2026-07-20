@@ -3,6 +3,7 @@ class User < ApplicationRecord
   TRANSACTIONS_TABLE_SORT_KEYS = %w[occurred_on description category_name source_name amount_cents].freeze
   TRANSACTIONS_TABLE_SORT_DIRECTIONS = %w[asc desc].freeze
   TRANSACTIONS_TABLE_IMPACT_MODES = %w[all normal third_party off_budget informational].freeze
+  THEME_PREFERENCES = %w[light dark system].freeze
   DEFAULT_TRANSACTIONS_TABLE_SORT = {
     "key" => "occurred_on",
     "direction" => "desc"
@@ -39,27 +40,35 @@ class User < ApplicationRecord
   def self.sanitize_ui_preferences_patch(input)
     preferences = input.respond_to?(:to_unsafe_h) ? input.to_unsafe_h : input
     preferences = preferences.is_a?(Hash) ? preferences.deep_stringify_keys : {}
+    sanitized_preferences = {}
+
+    appearance = preferences["appearance"]
+    if appearance.is_a?(Hash) && appearance.key?("theme")
+      sanitized_preferences["appearance"] = {
+        "theme" => normalize_theme_preference(appearance["theme"])
+      }
+    end
+
     transactions_table = preferences["transactions_table"]
+    if transactions_table.is_a?(Hash)
+      sanitized_transactions_table = {}
 
-    return {} unless transactions_table.is_a?(Hash)
+      if transactions_table.key?("column_order")
+        sanitized_transactions_table["column_order"] = normalize_transactions_table_column_order(transactions_table["column_order"])
+      end
 
-    sanitized_transactions_table = {}
+      if transactions_table.key?("sort")
+        sanitized_transactions_table["sort"] = normalize_transactions_table_sort(transactions_table["sort"])
+      end
 
-    if transactions_table.key?("column_order")
-      sanitized_transactions_table["column_order"] = normalize_transactions_table_column_order(transactions_table["column_order"])
+      if transactions_table.key?("impact_mode")
+        sanitized_transactions_table["impact_mode"] = normalize_transactions_table_impact_mode(transactions_table["impact_mode"])
+      end
+
+      sanitized_preferences["transactions_table"] = sanitized_transactions_table unless sanitized_transactions_table.empty?
     end
 
-    if transactions_table.key?("sort")
-      sanitized_transactions_table["sort"] = normalize_transactions_table_sort(transactions_table["sort"])
-    end
-
-    if transactions_table.key?("impact_mode")
-      sanitized_transactions_table["impact_mode"] = normalize_transactions_table_impact_mode(transactions_table["impact_mode"])
-    end
-
-    return {} if sanitized_transactions_table.empty?
-
-    { "transactions_table" => sanitized_transactions_table }
+    sanitized_preferences
   end
 
   def self.normalize_transactions_table_column_order(value)
@@ -86,6 +95,14 @@ class User < ApplicationRecord
     return impact_mode if TRANSACTIONS_TABLE_IMPACT_MODES.include?(impact_mode)
 
     "all"
+  end
+
+  def self.normalize_theme_preference(value)
+    theme = value.to_s
+
+    return theme if THEME_PREFERENCES.include?(theme)
+
+    "system"
   end
 
   private

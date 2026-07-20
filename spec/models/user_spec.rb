@@ -16,6 +16,34 @@ RSpec.describe User, type: :model do
   end
 
   describe ".sanitize_ui_preferences_patch" do
+    it "accepts supported appearance themes" do
+      %w[light dark system].each do |theme|
+        expect(
+          described_class.sanitize_ui_preferences_patch(
+            appearance: { theme: theme }
+          )
+        ).to eq(
+          "appearance" => { "theme" => theme }
+        )
+      end
+    end
+
+    it "normalizes an invalid appearance theme and preserves other accepted branches" do
+      sanitized = described_class.sanitize_ui_preferences_patch(
+        {
+          appearance: { theme: "sepia" },
+          transactions_table: { impact_mode: "third_party" }
+        }
+      )
+
+      expect(sanitized).to eq(
+        {
+          "appearance" => { "theme" => "system" },
+          "transactions_table" => { "impact_mode" => "third_party" }
+        }
+      )
+    end
+
     it "normalizes the transactions table preferences" do
       sanitized = described_class.sanitize_ui_preferences_patch(
         {
@@ -87,6 +115,9 @@ RSpec.describe User, type: :model do
           "dashboard" => {
             "collapsed" => true
           },
+          "appearance" => {
+            "theme" => "light"
+          },
           "transactions_table" => {
             "impact_mode" => "all"
           }
@@ -101,6 +132,9 @@ RSpec.describe User, type: :model do
               key: "amount_cents",
               direction: "desc"
             }
+          },
+          appearance: {
+            theme: "dark"
           }
         }
       )
@@ -109,6 +143,9 @@ RSpec.describe User, type: :model do
         {
           "dashboard" => {
             "collapsed" => true
+          },
+          "appearance" => {
+            "theme" => "dark"
           },
           "transactions_table" => {
             "impact_mode" => "all",

@@ -116,4 +116,46 @@ RSpec.describe "API me", type: :request do
       }
     )
   end
+
+  it "persists and serializes the appearance theme without dropping other preferences" do
+    user = create(
+      :user,
+      ui_preferences: {
+        "transactions_table" => {
+          "impact_mode" => "normal"
+        }
+      }
+    )
+
+    sign_in user
+
+    patch "/api/v1/me",
+      params: {
+        me: {
+          ui_preferences: {
+            appearance: {
+              theme: "dark"
+            }
+          }
+        }
+      }.to_json,
+      headers: {
+        "ACCEPT" => "application/json",
+        "CONTENT_TYPE" => "application/json",
+        "X-CSRF-Token" => csrf_token
+      }
+
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.dig("data", "ui_preferences")).to eq(
+      {
+        "transactions_table" => {
+          "impact_mode" => "normal"
+        },
+        "appearance" => {
+          "theme" => "dark"
+        }
+      }
+    )
+    expect(user.reload.ui_preferences).to eq(response.parsed_body.dig("data", "ui_preferences"))
+  end
 end
